@@ -3,3 +3,4 @@ results/
 mathematica/
 *.csv
 *.pdf
+*.DS_Store

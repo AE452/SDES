@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 # is the value iteration
 # dynamics between the value iteration properly, look at the image
-# somewhere deepcopy/copy
 
 # Define Strategy Classes
 class GrimTrigger_Simple:
@@ -41,7 +40,7 @@ class TitForTat:
 def convert_dict_to_mean_df(data_dict):
     dfs = []
     for key in data_dict.keys():
-        qvalues = data_dict[key].deepcopy()
+        qvalues = data_dict[key].copy()
         flattened_qvalues = [array.flatten() for array in qvalues]
 
         # Stack the flattened arrays into a 2D array
@@ -109,7 +108,7 @@ class PrisonersDilemmaSolver:
         for m in range(self.M):
             q1_history = []
             q1 = np.random.rand(self.A, self.S) if self.random_uniform else np.ones((self.A, self.S)) * 0.5
-            q1_val = q1.deepcopy()
+            q1_val = q1.copy()
             error = 1
             count = 0
             triggered_defection = False  # Used for Grim Trigger
@@ -143,7 +142,7 @@ class PrisonersDilemmaSolver:
                     q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                     q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                     q1_new = r1_pi2 + self.delta * q1_new
-                    q1_val = q1_new.deepcopy()
+                    q1_val = q1_new.copy()
 
                     # Check for convergence
                     if self.error_stop == 'any':
@@ -153,7 +152,7 @@ class PrisonersDilemmaSolver:
 
                 # Update Q-values and exploration rate
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
-                q1_history.append(q1.deepcopy()) 
+                q1_history.append(q1.copy()) 
                 
                 action = np.argmax(q1[:, 0])  # Choose action in state 0
                 actions_taken.append(action)
@@ -168,10 +167,10 @@ class PrisonersDilemmaSolver:
                     triggered_defection = True  # Grim Trigger condition
                 previous_action = np.array([1, 0]) if action == 0 else np.array([0, 1])  # For TitForTat
 
-                q1_val = q1.deepcopy()
+                q1_val = q1.copy()
                 count += 1
                 
-            q1_history_per_sample[m] = q1_history.deepcopy()
+            q1_history_per_sample[m] = q1_history.copy()
 
             e *= self.e_decay
 

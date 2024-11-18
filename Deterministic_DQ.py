@@ -1,7 +1,5 @@
 import numpy as np
 import time
-#check the value iteration: opponent playing gt (cooperation)--> value iteration for the other player(just on 1player)
-# what should i see is that for delta larger than 0.9, the player would collaborate,if delta < 0.9 the best response should be gt
 #mordor cluster --> Mathias 
 #hypercube sampling
 #delta small for initialization

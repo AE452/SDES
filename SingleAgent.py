@@ -143,12 +143,26 @@ class PrisonersDilemmaSolver:
                     q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                     q1_new = r1_pi2 + self.delta * q1_new
                     q1_val = q1_new.copy()
+                    # Debugging logs
+                    print(f"Iteration {k}:")
+                    print(f"  r1_pi2 (rewards): {r1_pi2}")
+                    print(f"  q1_max (future value estimates): {q1_max}")
+                    print(f"  q1_new (updated Q-values): {q1_new}")
 
+                    # Convergence check
+                    if self.error_stop == 'any':
+                        error = np.any(np.abs(q1_val - q1) > 1e-5)
+                    elif self.error_stop == 'mean':
+                        error = np.mean(np.abs(q1_val - q1)) > 1e-5
+
+                # After loop
                     # Check for convergence
                     if self.error_stop == 'any':
                         error = np.any(np.abs(q1_val - q1) > 1e-5)
                     elif self.error_stop == 'mean':
                         error = np.mean(np.abs(q1_val - q1)) > 1e-5
+                
+                print(f"Final Q-values:\n{q1}")
 
                 # Update Q-values and exploration rate
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)

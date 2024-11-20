@@ -76,3 +76,34 @@ Thus, the Q-value in 11 is:
 $$
 Q_{11} = \frac{0.2 + 0.4e}{1 - \delta}
 $$
+
+
+OR:
+
+### Bellman Equations for Theoretical Optimal Q-Values
+
+The theoretical optimal Q-values for Grim Trigger with \(\epsilon\)-greedy exploration are calculated using the following Bellman equations:
+
+                    q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+
+
+\[
+\begin{aligned}
+Q_{11} &= P + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
+Q_{00} &= R + \delta \left[ (1 - \epsilon) Q_{00} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
+Q_{01} &= T + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
+Q_{10} &= S + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right].
+\end{aligned}
+\]
+
+### Description:
+- \(Q_{11}\): Q-value for mutual cooperation.
+- \(Q_{00}\): Q-value for mutual defection.
+- \(Q_{01}\): Q-value when the agent defects and the opponent cooperates.
+- \(Q_{10}\): Q-value when the agent cooperates and the opponent defects.
+- \(P, R, T, S\): Payoffs from the game matrix.
+- \(\delta\): Discount factor (\(0 \leq \delta < 1\)).
+- \(\epsilon\): Probability of taking a random (exploratory) action.
+
+### Usage:
+The system of equations is solved iteratively or symbolically to compute the theoretical Q-values under the Grim Trigger strategy, accounting for \(\epsilon\)-greedy exploration.

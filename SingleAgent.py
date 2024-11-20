@@ -105,8 +105,11 @@ class PrisonersDilemmaSolver:
         actions_taken = []
         cooperations, defections = 0, 0
         e = self.e
+        grim_trigger_count_dict = {}
         for m in range(self.M):
             q1_history = []
+            grim_trigger_count=0
+
             q1 = np.random.rand(self.A, self.S) if self.random_uniform else np.ones((self.A, self.S)) * 0.5
             q1_val = q1.copy()
             error = 1
@@ -167,7 +170,8 @@ class PrisonersDilemmaSolver:
                 # Update Q-values and exploration rate
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
                 q1_history.append(q1.copy()) 
-                
+                if self.check_grim_trigger(q1):
+                    grim_trigger_count += 1
                 action = np.argmax(q1[:, 0])  # Choose action in state 0
                 actions_taken.append(action)
                 
@@ -183,7 +187,7 @@ class PrisonersDilemmaSolver:
 
                 q1_val = q1.copy()
                 count += 1
-                
+            grim_trigger_count_dict[m] = grim_trigger_count
             q1_history_per_sample[m] = q1_history.copy()
 
             e *= self.e_decay
@@ -205,7 +209,7 @@ class PrisonersDilemmaSolver:
         if self.plotting: 
             self.plot_q_values(q1_history_per_sample)
 
-        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample)
+        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample), grim_trigger_count_dict
     
     
     @staticmethod
@@ -239,3 +243,15 @@ class PrisonersDilemmaSolver:
 
         plt.tight_layout()
         plt.show()
+
+    @staticmethod
+    def check_grim_trigger(q_values, tolerance=1e-5):
+        """Check if Q-values match Grim Trigger behavior."""
+        Q00, Q01 = q_values[0, 0], q_values[1, 0]  # State 0 (cooperate, defect)
+        Q10, Q11 = q_values[0, 1], q_values[1, 1]  # State 1 (cooperate, defect)
+
+        # Grim Trigger conditions
+        condition_1 = Q00 > Q01 + tolerance  # Prefer cooperation in state 0
+        condition_2 = Q10 + tolerance < Q11  # Prefer defection in state 1
+
+        return condition_1 and condition_2

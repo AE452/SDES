@@ -87,14 +87,14 @@ The theoretical optimal Q-values for Grim Trigger with \(\epsilon\)-greedy explo
                     q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
 
 
-\[
-\begin{aligned}
+
+$$
 Q_{11} &= P + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
 Q_{00} &= R + \delta \left[ (1 - \epsilon) Q_{00} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
 Q_{01} &= T + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right], \\
 Q_{10} &= S + \delta \left[ (1 - \epsilon) Q_{11} + \epsilon \cdot \frac{1}{4} (Q_{11} + Q_{00} + Q_{01} + Q_{10}) \right].
-\end{aligned}
-\]
+$$
+
 
 ### Description:
 - \(Q_{11}\): Q-value for mutual cooperation.

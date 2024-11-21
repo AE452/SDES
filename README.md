@@ -11,7 +11,7 @@ The Payoff Matrix:
 # E-GT: Exploration in Game Theory
 
 ## States
-The states are defined as:
+The state space is defined as:
 $$
 O_0 = \{C, C\}, \quad O_1 = \{D, (C, D), (D, D)\}
 $$
@@ -29,7 +29,6 @@ D & T = 1 & P = -0.2 \\
 $$
 
 ## Q-value Updates for Opponent E-GT
-The Q-values are updated using the following equations:
 
 ### For \( O_0 \):
 1. Cooperation in \( O_0 \):
@@ -55,58 +54,51 @@ The Q-values are updated using the following equations:
 
 ## Scenarios for Different Opponent Strategies
 
-### Case 1: Opponent plays \( CC \)
-If the opponent cooperates entirely (\( CC \)):
-- The Q-values are updated as:
-  $$
-  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
-  $$
-  $$
-  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
-  $$
-  $$
-  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
-  $$
-  $$
-  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
-  $$
+### Case 1: Opponent Plays \( CC \)
+If the opponent cooperates entirely (\( CC \)), the Q-values are updated as:
+$$
+Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
+$$
+$$
+Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+$$
+$$
+Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+$$
+$$
+Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+$$
 
-### Case 2: Opponent plays \( AD \)
-If the opponent alternates cooperation and defection (\( AD \)):
-- Update rules are:
-  $$
-  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
-  $$
-  $$
-  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
-  $$
-  $$
-  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
-  $$
-  $$
-  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
-  $$
+### Case 2: Opponent Plays \( AD \)
+For alternating cooperation and defection (\( AD \)):
+$$
+Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
+$$
+$$
+Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+$$
+$$
+Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+$$
+$$
+Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+$$
 
-### Case 3: Opponent plays \( AC \)
-If the opponent alternates cooperation and defection (\( AC \)):
-- Update rules are the same as \( AD \), replacing the state transitions.
+### Case 3: Opponent Plays \( AC \)
+If the opponent alternates cooperation (\( AC \)), the same Q-value updates apply.
 
-### Case 4: Opponent plays \( AG \)
-For a general strategy \( AG \), where the opponent may defect in \( O_0 \) but cooperate in \( O_1 \):
-- The Q-values follow this structure:
-  $$
-  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} \xi
-  $$
-  $$
-  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
-  $$
-  $$
-  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
-  $$
-  $$
-  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
-  $$
+### Case 4: Opponent Plays \( AG \)
+If the opponent uses a general strategy (\( AG \)):
+$$
+Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} \xi
+$$
+$$
+Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+$$
+$$
+Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+$$
+$$
+Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+$$
 
----
-
-Feel free to modify or add more details as required!

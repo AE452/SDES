@@ -1,0 +1,3 @@
+GT: cooperates in CC and defects otherwise.
+AGT: defects in CC and cooperates otherwise (?)
+# plot the value iteration: initial qvalues ---> optimal theoretical qvalues, delete the while loop, if the difference between 

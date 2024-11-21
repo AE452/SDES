@@ -37,7 +37,7 @@ class TitForTat:
             self.previous_opponent_move = opponent_move  # Store as 1D array
         return self.previous_opponent_move
 
-def convert_dict_to_mean_df(data_dict):
+def convert_dict_to_mean_df(data_dict, mean = True):
     dfs = []
     for key in data_dict.keys():
         qvalues = data_dict[key].copy()
@@ -49,35 +49,40 @@ def convert_dict_to_mean_df(data_dict):
         # Convert to DataFrame with appropriate column names
         df = pd.DataFrame(stacked_qvalues, columns=["Q1", "Q2", "Q3", "Q4"])
         dfs.append(df)
+    
 
-    max_length = max(len(df) for df in dfs)
+    if mean:
+        max_length = max(len(df) for df in dfs)
 
-    mean_rows = []
+        mean_rows = []
 
-    for i in range(max_length):
-        row_means = []
+        for i in range(max_length):
+            row_means = []
 
-        for df in dfs:
-            if i < len(df):  # If the row exists in this DataFrame
-                row_means.append(df.iloc[i][['Q1', 'Q2', 'Q3', 'Q4']].values)
-            else:  # If the row does not exist, append NaNs
-                row_means.append([np.nan, np.nan, np.nan, np.nan])
+            for df in dfs:
+                if i < len(df):  # If the row exists in this DataFrame
+                    row_means.append(df.iloc[i][['Q1', 'Q2', 'Q3', 'Q4']].values)
+                else:  # If the row does not exist, append NaNs
+                    row_means.append([np.nan, np.nan, np.nan, np.nan])
 
-        # Compute the mean for each column (Q1, Q2, Q3, Q4) across all DataFrames
-        mean_row = np.nanmean(row_means, axis=0)  # np.nanmean ignores NaN values
+            # Compute the mean for each column (Q1, Q2, Q3, Q4) across all DataFrames
+            mean_row = np.nanmean(row_means, axis=0)  # np.nanmean ignores NaN values
 
-        mean_rows.append(mean_row)
+            mean_rows.append(mean_row)
 
-    # Convert the list of row-wise means into a DataFrame
-    mean_df = pd.DataFrame(mean_rows, columns=['Q1', 'Q2', 'Q3', 'Q4'])
+        # Convert the list of row-wise means into a DataFrame
+        mean_df = pd.DataFrame(mean_rows, columns=['Q1', 'Q2', 'Q3', 'Q4'])
+        return mean_df
+    
+    else:
+        return dfs
 
-    return mean_df
 
 
 
 # Main Solver Class
 class PrisonersDilemmaSolver:
-    def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True):
+    def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True, check_on_value_iteration = False, gt_learned_check = False):
         self.strategy = strategy
         self.e = e_initial
         self.lambda_val = lambda_val
@@ -90,6 +95,8 @@ class PrisonersDilemmaSolver:
         self.error_stop = error_stop
         self.verbose = verbose
         self.plotting = plotting
+        self.check_on_value_iteration = check_on_value_iteration
+        self.gt_learned_check = gt_learned_check
 
         # Define constants for Prisoner's Dilemma
         self.S, self.A = 2, 2
@@ -106,111 +113,149 @@ class PrisonersDilemmaSolver:
         cooperations, defections = 0, 0
         e = self.e
         grim_trigger_count_dict = {}
+        qval_inner_value_iteration = {}
+
         for m in range(self.M):
             q1_history = []
             grim_trigger_count=0
-
+            q_list = []
             q1 = np.random.rand(self.A, self.S) if self.random_uniform else np.ones((self.A, self.S)) * 0.5
             q1_val = q1.copy()
             error = 1
             count = 0
             triggered_defection = False  # Used for Grim Trigger
             previous_action = np.array([1, 0])  # Assume initial cooperation by Player 1 for TitForTat
+            if self.check_on_value_iteration:
+                for i in range(1):
+                    if isinstance(self.strategy, GrimTrigger_Simple):
+                        pi2 = np.array([self.strategy.get_action(triggered_defection), 
+                                        self.strategy.get_action(triggered_defection)]).T
+                        
+                    elif isinstance(self.strategy, GrimTrigger_QValues):
+                        pi2 = np.array([self.strategy.get_action(q1, 0),
+                                        self.strategy.get_action(q1, 1)]).T
 
-            while error:
-                if isinstance(self.strategy, GrimTrigger_Simple):
-                    pi2 = np.array([self.strategy.get_action(triggered_defection), 
-                                    self.strategy.get_action(triggered_defection)]).T
+                    elif isinstance(self.strategy, TitForTat):
+                        pi2 = np.array([self.strategy.get_action(previous_action),
+                                        self.strategy.get_action(previous_action)]).T
+                    else:
+                        raise ValueError("Unsupported strategy")
+
+                    # Ensure pi2 is 2x2 for matrix multiplication
+                    pi2 = pi2.reshape(2, 2)
+
+                    r1_pi2 = np.dot(self.r1, pi2)
+                    P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
+                                        self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
+                    P1_D_pi2 = np.array([self.P_DC[0] * pi2[0, 0] + self.P_DD[0] * pi2[1, 0], 
+                                        self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
+
+                    for k in range(self.K):
+                        q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                        q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
+                        q1_new = r1_pi2 + self.delta * q1_new
+                        q1_val = q1_new.copy()
+                        q_list.append(q1_val)
+                    qval_inner_value_iteration[m]= q_list
+
+                return qval_inner_value_iteration
+            else:
+                while error:
+                    if isinstance(self.strategy, GrimTrigger_Simple):
+                        pi2 = np.array([self.strategy.get_action(triggered_defection), 
+                                        self.strategy.get_action(triggered_defection)]).T
+                        
+                    elif isinstance(self.strategy, GrimTrigger_QValues):
+                        pi2 = np.array([self.strategy.get_action(q1, 0),
+                                        self.strategy.get_action(q1, 1)]).T
+
+                    elif isinstance(self.strategy, TitForTat):
+                        pi2 = np.array([self.strategy.get_action(previous_action),
+                                        self.strategy.get_action(previous_action)]).T
+                    else:
+                        raise ValueError("Unsupported strategy")
+
+                    # Ensure pi2 is 2x2 for matrix multiplication
+                    pi2 = pi2.reshape(2, 2)
+
+                    r1_pi2 = np.dot(self.r1, pi2)
+                    P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
+                                        self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
+                    P1_D_pi2 = np.array([self.P_DC[0] * pi2[0, 0] + self.P_DD[0] * pi2[1, 0], 
+                                        self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
+
+                    for k in range(self.K):
+                        q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                        q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
+                        q1_new = r1_pi2 + self.delta * q1_new
+                        q1_val = q1_new.copy()
+                        # Debugging logs
+                        #print(f"Iteration {k}:")
+                        #print(f"  r1_pi2 (rewards): {r1_pi2}")
+                        #print(f"  q1_max (future value estimates): {q1_max}")
+                        #print(f"  q1_new (updated Q-values): {q1_new}")
+
+                        # Convergence check
+                        if self.error_stop == 'any':
+                            error = np.any(np.abs(q1_val - q1) > 1e-5)
+                        elif self.error_stop == 'mean':
+                            error = np.mean(np.abs(q1_val - q1)) > 1e-5
+
+                    # After loop
+                        # Check for convergence
+                        if self.error_stop == 'any':
+                            error = np.any(np.abs(q1_val - q1) > 1e-5)
+                        elif self.error_stop == 'mean':
+                            error = np.mean(np.abs(q1_val - q1)) > 1e-5
                     
-                elif isinstance(self.strategy, GrimTrigger_QValues):
-                    pi2 = np.array([self.strategy.get_action(q1, 0),
-                                    self.strategy.get_action(q1, 1)]).T
+                    #print(f"Final Q-values:\n{q1}")
 
-                elif isinstance(self.strategy, TitForTat):
-                    pi2 = np.array([self.strategy.get_action(previous_action),
-                                    self.strategy.get_action(previous_action)]).T
-                else:
-                    raise ValueError("Unsupported strategy")
+                    # Update Q-values and exploration rate
+                    q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
+                    q1_history.append(q1.copy()) 
+                    if self.check_grim_trigger(q1):
+                        grim_trigger_count += 1
+                    action = np.argmax(q1[:, 0])  # Choose action in state 0
+                    actions_taken.append(action)
+                    
+                    if action == 0:
+                        cooperations += 1
+                    else:
+                        defections += 1
 
-                # Ensure pi2 is 2x2 for matrix multiplication
-                pi2 = pi2.reshape(2, 2)
+                    # Set triggered_defection for GrimTrigger and update previous_action for TitForTat
+                    if action == 1:
+                        triggered_defection = True  # Grim Trigger condition
+                    previous_action = np.array([1, 0]) if action == 0 else np.array([0, 1])  # For TitForTat
 
-                r1_pi2 = np.dot(self.r1, pi2)
-                P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
-                                     self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
-                P1_D_pi2 = np.array([self.P_DC[0] * pi2[0, 0] + self.P_DD[0] * pi2[1, 0], 
-                                     self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
-
-                for k in range(self.K):
-                    q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
-                    q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-                    q1_new = r1_pi2 + self.delta * q1_new
-                    q1_val = q1_new.copy()
-                    # Debugging logs
-                    #print(f"Iteration {k}:")
-                    #print(f"  r1_pi2 (rewards): {r1_pi2}")
-                    #print(f"  q1_max (future value estimates): {q1_max}")
-                    #print(f"  q1_new (updated Q-values): {q1_new}")
-
-                    # Convergence check
-                    if self.error_stop == 'any':
-                        error = np.any(np.abs(q1_val - q1) > 1e-5)
-                    elif self.error_stop == 'mean':
-                        error = np.mean(np.abs(q1_val - q1)) > 1e-5
-
-                # After loop
-                    # Check for convergence
-                    if self.error_stop == 'any':
-                        error = np.any(np.abs(q1_val - q1) > 1e-5)
-                    elif self.error_stop == 'mean':
-                        error = np.mean(np.abs(q1_val - q1)) > 1e-5
+                    q1_val = q1.copy()
+                    count += 1
                 
-                #print(f"Final Q-values:\n{q1}")
+                if self.gt_learned_check:
+                    grim_trigger_count_dict[m] = grim_trigger_count
+                q1_history_per_sample[m] = q1_history.copy()
 
-                # Update Q-values and exploration rate
-                q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
-                q1_history.append(q1.copy()) 
-                if self.check_grim_trigger(q1):
-                    grim_trigger_count += 1
-                action = np.argmax(q1[:, 0])  # Choose action in state 0
-                actions_taken.append(action)
-                
-                if action == 0:
-                    cooperations += 1
-                else:
-                    defections += 1
-
-                # Set triggered_defection for GrimTrigger and update previous_action for TitForTat
-                if action == 1:
-                    triggered_defection = True  # Grim Trigger condition
-                previous_action = np.array([1, 0]) if action == 0 else np.array([0, 1])  # For TitForTat
-
-                q1_val = q1.copy()
-                count += 1
-            grim_trigger_count_dict[m] = grim_trigger_count
-            q1_history_per_sample[m] = q1_history.copy()
-
-            e *= self.e_decay
+                e *= self.e_decay
 
 
-        if self.verbose:
-            print("Final Q-values for Player 1:")
-            print(q1)
-            if np.argmax(q1[:, 0]) == 1:
-                print("Final Q-values for Player 1 tell us that the player is Defecting")
-            else: 
-                print("Final Q-values for Player 1 tell us that the player is Collaborating")
+                if self.verbose:
+                    print("Final Q-values for Player 1:")
+                    print(q1)
+                    if np.argmax(q1[:, 0]) == 1:
+                        print("Final Q-values for Player 1 tell us that the player is Defecting")
+                    else: 
+                        print("Final Q-values for Player 1 tell us that the player is Collaborating")
 
 
-        print(f"Number of collaborations: {cooperations}, Number of defections: {defections}")
-        print("Expected behavior:", "collaborate more" if self.delta >= 0.9 else "defect more")
+                print(f"Number of collaborations: {cooperations}, Number of defections: {defections}")
+                print("Expected behavior:", "collaborate more" if self.delta >= 0.9 else "defect more")
 
-        # Plotting results
-        if self.plotting: 
-            self.plot_q_values(q1_history_per_sample)
+                # Plotting results
+                if self.plotting: 
+                    self.plot_q_values(q1_history_per_sample)
 
-        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample), grim_trigger_count_dict
-    
+                return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample), grim_trigger_count_dict
+            
     
     @staticmethod
     def plot_q_values(q1_history_per_sample):

@@ -211,14 +211,14 @@ class PrisonersDilemmaSolver:
                     print("Final Q-values for Player 1 tell us that the player is Collaborating")
 
 
-            print(f"Number of collaborations: {cooperations}, Number of defections: {defections}")
-            print("Expected behavior:", "collaborate more" if self.delta >= 0.9 else "defect more")
+                print(f"Number of collaborations: {cooperations}, Number of defections: {defections}")
+                print("Expected behavior:", "collaborate more" if self.delta >= 0.9 else "defect more")
 
-            # Plotting results
-            if self.plotting: 
-                self.plot_q_values(q1_history_per_sample)
+        # Plotting results
+        if self.plotting: 
+            self.plot_q_values(q1_history_per_sample)
 
-        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample), grim_trigger_count_dict
+        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict
 
 
     def check_value_iteration(self):
@@ -268,7 +268,7 @@ class PrisonersDilemmaSolver:
     
     @staticmethod
     def plot_q_values(q1_history_per_sample):
-        q1_history = convert_dict_to_mean_df(q1_history_per_sample)
+        q1_history = convert_dict_to_mean_df(q1_history_per_sample, mean=True)
 
         fig, axs = plt.subplots(2, 2, figsize=(8, 8))
         axs[0, 0].plot(q1_history['Q1'], linestyle='--', label="Q-value Action 0 (Cooperate, State 0)")

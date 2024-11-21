@@ -79,7 +79,15 @@ def convert_dict_to_mean_df(data_dict, mean = True):
 
 
 
-
+def generate_unique_2x2():
+    # Generate a 2x2 array with random values
+    array = np.random.rand(2, 2)
+    
+    # Ensure the values are distinct by checking and regenerating if any values are the same
+    while len(np.unique(array)) < 4:
+        array = np.random.rand(2, 2)
+    
+    return array
 # Main Solver Class
 class PrisonersDilemmaSolver:
     def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True, check_on_value_iteration = False, gt_learned_check = False):
@@ -116,7 +124,8 @@ class PrisonersDilemmaSolver:
         for m in range(self.M):
             q1_history = []
             grim_trigger_count=0
-            q1 = np.random.rand(self.A, self.S) if self.random_uniform else np.ones((self.A, self.S)) * 0.5
+
+            q1 = generate_unique_2x2() if self.random_uniform else np.ones((self.A, self.S)) * 0.5
             q1_val = q1.copy()
             error = 1
             count = 0

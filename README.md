@@ -7,72 +7,106 @@ The Payoff Matrix:
 | **Cooperate (C)**       | R = 0.8           | S = 0          |
 | **Defect (D)**          | T = 1.0           | P = 0.2        |
 
-### Theoretical Q-Values for Grim Trigger
 
-The Q-values are:
+# E-GT: Exploration in Game Theory
 
+## States
+The states are defined as:
 $$
-Q_{11} = \frac{P}{1 - \delta} = \frac{0.2}{1 - 0.5} = 0.4
-$$
-
-$$
-Q_{00} = R + \delta Q_{11} = 0.8 + 0.5 \cdot 0.4 = 1.0
+O_0 = \{C, C\}, \quad O_1 = \{D, (C, D), (D, D)\}
 $$
 
+## Payoff Matrix
+The payoff matrix for the game is:
 $$
-Q_{01} = T + \delta Q_{11} = 1.0 + 0.5 \cdot 0.4 = 1.2
-$$
-
-$$
-Q_{10} = S + \delta Q_{11} = 0 + 0.5 \cdot 0.4 = 0.2
-$$
-
-### Theoretical Q-Values for Grim Trigger incorporating epsilon
-
-For **Q_00** in state 0 (neither player defected previously):
-
-$$
-R(s_0, a_0) = (1 - e) \cdot 0.8 + e \cdot 0 = 0.8(1 - e)
+\begin{array}{c|c|c|}
+    & C & D \\
+\hline
+C & R = 0.5 & S = 0 \\
+D & T = 1 & P = -0.2 \\
+\hline
+\end{array}
 $$
 
-Thus, the Q-value in 00 is:
+## Q-value Updates for Opponent E-GT
+The Q-values are updated using the following equations:
 
-$$
-Q_{00} = \frac{0.8(1 - e)}{1 - \delta}
-$$
+### For \( O_0 \):
+1. Cooperation in \( O_0 \):
+   $$
+   Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta \max \{Q_{00}, Q_{10}\}\Big] + \frac{\varepsilon}{2} \xi
+   $$
 
-For **Q_01** in state 0 (neither player defected previously):
+2. Defection in \( O_0 \):
+   $$
+   Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta \max \{Q_{01}, Q_{11}\}\Big] + \frac{\varepsilon}{2} \rho
+   $$
 
-$$
-R(s_0, a_1) = (1 - e) \cdot 1 + e \cdot 0.2 = 1 - 0.8e
-$$
+### For \( O_1 \):
+1. Cooperation in \( O_1 \):
+   $$
+   Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta \max \{Q_{00}, Q_{10}\}\Big] + \frac{\varepsilon}{2} \xi
+   $$
 
-So, the Q-value in 01 is:
+2. Defection in \( O_1 \):
+   $$
+   Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta \max \{Q_{01}, Q_{11}\}\Big] + \frac{\varepsilon}{2} T
+   $$
 
-$$
-Q_{01} = (1 - 0.8e) + \delta \cdot Q_{11}
-$$
+## Scenarios for Different Opponent Strategies
 
-For **Q_10** in state 1 (at least one player defected previously):
+### Case 1: Opponent plays \( CC \)
+If the opponent cooperates entirely (\( CC \)):
+- The Q-values are updated as:
+  $$
+  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
+  $$
+  $$
+  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+  $$
+  $$
+  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+  $$
+  $$
+  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+  $$
 
-$$
-R(s_1, a_0) = \frac{e}{2} \cdot 1 + \left(1 - \frac{e}{2}\right) \cdot 0.2 = 0.2 + 0.4e
-$$
+### Case 2: Opponent plays \( AD \)
+If the opponent alternates cooperation and defection (\( AD \)):
+- Update rules are:
+  $$
+  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} S
+  $$
+  $$
+  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+  $$
+  $$
+  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+  $$
+  $$
+  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+  $$
 
-So, the Q-value in 10 is:
+### Case 3: Opponent plays \( AC \)
+If the opponent alternates cooperation and defection (\( AC \)):
+- Update rules are the same as \( AD \), replacing the state transitions.
 
-$$
-Q_{10} = \frac{0.2 + 0.4e}{1 - \delta}
-$$
+### Case 4: Opponent plays \( AG \)
+For a general strategy \( AG \), where the opponent may defect in \( O_0 \) but cooperate in \( O_1 \):
+- The Q-values follow this structure:
+  $$
+  Q_{00} = (1 - \frac{\varepsilon}{2}) \Big[R + \delta Q_{00}\Big] + \frac{\varepsilon}{2} \xi
+  $$
+  $$
+  Q_{01} = (1 - \frac{\varepsilon}{2}) \Big[T + \delta Q_{11}\Big] + \frac{\varepsilon}{2} P
+  $$
+  $$
+  Q_{10} = (1 - \frac{\varepsilon}{2}) \Big[S + \delta Q_{10}\Big] + \frac{\varepsilon}{2} R
+  $$
+  $$
+  Q_{11} = (1 - \frac{\varepsilon}{2}) \Big[P + \delta Q_{01}\Big] + \frac{\varepsilon}{2} T
+  $$
 
-For **Q_11** in state 1 (at least one player defected previously):
+---
 
-$$
-R(s_1, a_1) = \frac{e}{2} \cdot 1 + \left(1 - \frac{e}{2}\right) \cdot 0.2 = 0.2 + 0.4e
-$$
-
-Thus, the Q-value in 11 is:
-
-$$
-Q_{11} = \frac{0.2 + 0.4e}{1 - \delta}
-$$
+Feel free to modify or add more details as required!

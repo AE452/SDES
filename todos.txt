@@ -1,6 +1,2 @@
 GT: cooperates in CC and defects otherwise.
 AGT: defects in CC and cooperates otherwise (?)
-
-
-TO DO:
-add a constraint in the initialization: the qvalues cannot be equals or very similar otherwise they don't converge.

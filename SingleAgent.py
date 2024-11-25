@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.stats import qmc
+
 # is the value iteration
 # dynamics between the value iteration properly, look at the image
 
@@ -79,15 +81,28 @@ def convert_dict_to_mean_df(data_dict, mean = True):
 
 
 
+
 def generate_unique_2x2():
     # Generate a 2x2 array with random values
     array = np.random.rand(2, 2)
     
-    # Ensure the values are distinct by checking and regenerating if any values are the same
-    while len(np.unique(array)) < 4:
+    # Ensure the values are distinct when rounded to two decimal points
+    while len(np.unique(array.round(1))) < 4:
         array = np.random.rand(2, 2)
     
     return array
+
+def latin_hypercube_sampling():
+    sampler = qmc.LatinHypercube(d=4)
+    sample = sampler.random(n=1)
+    unique_2x2_array = sample.reshape(2, 2)
+    while len(np.unique(unique_2x2_array)) < 4:
+        sample = sampler.random(n=1)
+        unique_2x2_array = sample.reshape(2, 2)
+    
+    return unique_2x2_array
+
+
 # Main Solver Class
 class PrisonersDilemmaSolver:
     def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True, check_on_value_iteration = False, gt_learned_check = False):
@@ -121,11 +136,19 @@ class PrisonersDilemmaSolver:
         cooperations, defections = 0, 0
         grim_trigger_count_dict = {}
         e = self.e
+        initial_q_value = []
         for m in range(self.M):
             q1_history = []
-            grim_trigger_count=0
+            grim_trigger_count = 0
 
-            q1 = generate_unique_2x2() if self.random_uniform else np.ones((self.A, self.S)) * 0.5
+            # Reset and reinitialize q1
+            if self.random_uniform:
+                q1 = generate_unique_2x2()
+            else:
+                q1 = latin_hypercube_sampling()
+
+            # Store initial values
+            initial_q_value.append(q1.copy())
             q1_val = q1.copy()
             error = 1
             count = 0
@@ -162,6 +185,8 @@ class PrisonersDilemmaSolver:
                     q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                     q1_new = r1_pi2 + self.delta * q1_new
                     q1_val = q1_new.copy()
+
+                
                     # Debugging logs
                     #print(f"Iteration {k}:")
                     #print(f"  r1_pi2 (rewards): {r1_pi2}")
@@ -227,7 +252,7 @@ class PrisonersDilemmaSolver:
         if self.plotting: 
             self.plot_q_values(q1_history_per_sample)
 
-        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict
+        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict, initial_q_value
 
 
     def check_value_iteration(self):

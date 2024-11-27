@@ -17,16 +17,18 @@ class GrimTrigger_Simple:
             self.triggered_defection = True
         return np.array([0, 1]) if self.triggered_defection else np.array([1, 0])
     
-class GrimTrigger_QValues:
+
+class epsilon_GrimTrigger:
     """Grim Trigger strategy: Cooperate unless the other player has a better Q-value for defecting."""
     def __init__(self):
         pass
 
-    def get_action(self, q_values, state):
+    def get_action(self, epsilon_value):
         """Determine action based on Q-values."""
-        q_cooperate, q_defect = q_values[:, state]
         # Cooperate if Q_cooperate > Q_defect, otherwise defect
-        return np.array([1, 0]) if q_cooperate > q_defect else np.array([0, 1])
+        return np.array([np.array([1-epsilon_value/2, epsilon_value/2]), np.array([epsilon_value/2, 1-epsilon_value/2])]) 
+    
+    
 
     
 class TitForTat:
@@ -93,6 +95,7 @@ def generate_unique_2x2():
     return array
 
 def latin_hypercube_sampling():
+    
     sampler = qmc.LatinHypercube(d=4)
     sample = sampler.random(n=1)
     unique_2x2_array = sample.reshape(2, 2)
@@ -161,9 +164,8 @@ class PrisonersDilemmaSolver:
                     pi2 = np.array([self.strategy.get_action(triggered_defection), 
                                     self.strategy.get_action(triggered_defection)]).T
                     
-                elif isinstance(self.strategy, GrimTrigger_QValues):
-                    pi2 = np.array([self.strategy.get_action(q1, 0),
-                                    self.strategy.get_action(q1, 1)]).T
+                elif isinstance(self.strategy, epsilon_GrimTrigger):
+                    pi2 = self.strategy.get_action(epsilon_value=e)
 
                 elif isinstance(self.strategy, TitForTat):
                     pi2 = np.array([self.strategy.get_action(previous_action),
@@ -260,7 +262,11 @@ class PrisonersDilemmaSolver:
         e = self.e
         for m in range(self.M):
             q_list = []
-            q1 = np.random.rand(self.A, self.S) if self.random_uniform else np.ones((self.A, self.S)) * 0.5
+            if self.random_uniform:
+                q1 = generate_unique_2x2()
+            else:
+                q1 = latin_hypercube_sampling()
+            
             q1_val = q1.copy()
             triggered_defection = False  # Used for Grim Trigger
             previous_action = np.array([1, 0])
@@ -269,9 +275,8 @@ class PrisonersDilemmaSolver:
                 pi2 = np.array([self.strategy.get_action(triggered_defection), 
                                 self.strategy.get_action(triggered_defection)]).T
                 
-            elif isinstance(self.strategy, GrimTrigger_QValues):
-                pi2 = np.array([self.strategy.get_action(q1, 0),
-                                self.strategy.get_action(q1, 1)]).T
+            elif isinstance(self.strategy, epsilon_GrimTrigger):
+                pi2 = self.strategy.get_action(epsilon_value=e)
 
             elif isinstance(self.strategy, TitForTat):
                 pi2 = np.array([self.strategy.get_action(previous_action),

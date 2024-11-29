@@ -46,11 +46,7 @@ def convert_dict_to_mean_df(data_dict, mean = True):
     for key in data_dict.keys():
         qvalues = data_dict[key].copy()
         flattened_qvalues = [array.flatten() for array in qvalues]
-
-        # Stack the flattened arrays into a 2D array
         stacked_qvalues = np.vstack(flattened_qvalues)
-
-        # Convert to DataFrame with appropriate column names
         df = pd.DataFrame(stacked_qvalues, columns=["Q1", "Q2", "Q3", "Q4"])
         dfs.append(df)
     

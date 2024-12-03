@@ -200,7 +200,7 @@ def create_line(value, length=10):
 
 
 
-# Main Solver Class
+
 class PrisonersDilemmaSolver:
     def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True, check_on_value_iteration = False, gt_learned_check = False):
         self.strategy = strategy

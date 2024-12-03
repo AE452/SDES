@@ -1,2 +1,6 @@
 GT: cooperates in CC and defects otherwise.
 AGT: defects in CC and cooperates otherwise (?)
+
+
+Reduce function mathematica for calculating delta and epsilon:
+eGT: Q00>Q01 Q11>Q10

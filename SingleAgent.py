@@ -28,9 +28,69 @@ class epsilon_GrimTrigger:
         # Cooperate if Q_cooperate > Q_defect, otherwise defect
         return np.array([np.array([1-epsilon_value/2, epsilon_value/2]), np.array([epsilon_value/2, 1-epsilon_value/2])]) 
     
-    
+class Theoretical_QValueCalculator:
+    def __init__(self, epsilon, P, R, T, S):
+        """
+        Initialize the QValueCalculator with game parameters.
+        
+        Parameters:
+            epsilon (float): The noise parameter (probability of random defection/cooperation).
+            P (float): The payoff for both players defecting (Punishment).
+            R (float): The payoff for both players cooperating (Reward).
+            T (float): The payoff for defecting when the opponent cooperates (Temptation).
+            S (float): The payoff for cooperating when the opponent defects (Sucker's payoff).
+        """
+        self.epsilon = epsilon
+        self.P = P
+        self.R = R
+        self.T = T
+        self.S = S
 
-    
+    def calculate_q_values_eGT(self, delta):
+        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - delta)
+        numerator_Q00 = (1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * delta * Q11
+        denominator_Q00 = 1 - (1 - self.epsilon / 2) * delta
+        Q00 = numerator_Q00 / denominator_Q00
+        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + delta * Q11
+        Q01 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * delta * Q00
+
+        return Q00, Q01, Q10, Q11
+
+    def calculate_q_values_eAD(self, delta):
+        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - delta)
+        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + delta * Q11
+        Q01 = ((1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * delta * Q11 + (self.epsilon / 2) * self.R) / (1 - delta)
+        Q00 = (1 - self.epsilon / 2) * self.R + ((1 - self.epsilon / 2) * delta * Q01) + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * delta * Q11)
+
+        return Q00, Q01, Q10, Q11
+
+    def calculate_q_values_eAC(self, delta):
+        Q10 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) / (1 - delta)
+        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + delta * Q10
+        Q00 = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * delta * Q10)) / (1 - (1 - self.epsilon / 2) * delta)
+        Q01 = (1 - self.epsilon / 2) * self.S + ((1 - self.epsilon / 2) * delta * Q10) + (self.epsilon / 2) * self.R + (self.epsilon / 2) * delta * Q00
+
+        return Q00, Q01, Q10, Q11
+
+    def calculate_q_values(self, delta, c1, c2):
+        """
+        Calculate the Q-values based on the range of delta.
+        
+        Parameters:
+            delta (float): The discount factor (future rewards weight).
+            c1 (float): Lower bound for eGT calculation.
+            c2 (float): Upper bound for eGT calculation.
+        
+        Returns:
+            tuple: Q-values (Q00, Q01, Q10, Q11).
+        """
+        if delta < c1:
+            return self.calculate_q_values_eAD(delta)
+        elif c1 <= delta <= c2:
+            return self.calculate_q_values_eGT(delta)
+        else:
+            return self.calculate_q_values_eAC(delta)
+      
 class TitForTat:
     """Tit-for-Tat strategy: Cooperate initially, then copy opponent's last move."""
     def __init__(self):
@@ -124,6 +184,20 @@ def latin_hypercube_sampling():
         unique_2x2_array = sample.reshape(2, 2)
     
     return unique_2x2_array
+
+def create_line(value, length=10):
+    """
+    Create a line of repeated values.
+
+    Parameters:
+        value (float): The value to repeat.
+        length (int): The number of times to repeat the value.
+
+    Returns:
+        list: A list containing the repeated values.
+    """
+    return [value for _ in range(length)]
+
 
 
 # Main Solver Class
@@ -278,7 +352,6 @@ class PrisonersDilemmaSolver:
 
         return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict, initial_q_value
 
-
     def check_value_iteration(self):
         qval_inner_value_iteration = {}
         e = self.e
@@ -327,8 +400,94 @@ class PrisonersDilemmaSolver:
 
 
         return qval_inner_value_iteration
-
     
+    def plot_values(self, ax, dfs, mean_df, theoretical_value, column, linestyle_mean, linestyle_theoretical, title, xlabel, ylabel, starting_point_print):
+        """
+        Plot Q-values for a specific subplot.
+
+        Parameters:
+            ax: Subplot axis to plot on.
+            dfs: List of DataFrames containing individual runs.
+            mean_df: DataFrame containing mean values across runs.
+            theoretical_value: Theoretical Q-value to plot.
+            column: The column in the DataFrames to plot.
+            linestyle_mean: Line style for the mean plot.
+            linestyle_theoretical: Line style for the theoretical plot.
+            title: Title of the subplot.
+            xlabel: X-axis label.
+            ylabel: Y-axis label.
+            starting_point_print: Whether to print starting values.
+        """
+        for i, df in enumerate(dfs):
+            if starting_point_print:
+                print(f"Starting {column} for sampling {i} is {df[column][0]}")
+            ax.plot(df[column], linestyle='--', label=f"{column} - Iteration {i+1}")
+        ax.plot(mean_df[column], linestyle=linestyle_mean, label=f"{column} mean")
+        ax.plot(create_line(theoretical_value, len(mean_df)), linestyle=linestyle_theoretical, label=f"Theoretical {column}")
+
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.legend()
+    
+    def print_starting_conditions(dfs):
+        """
+        Print the starting conditions for all sampling numbers.
+
+        Parameters:
+            dfs: List of DataFrames containing individual runs.
+        """
+        for i, df in enumerate(dfs):
+            if df['Q1'][0] > df['Q2'][0]:
+                print(f'Starting Condition for sampling n° {i} is cooperating in State 0')
+            elif df['Q1'][0] < df['Q2'][0]:
+                print(f'Starting Condition for sampling n° {i} is defecting in State 0')
+            else:
+                print(f'Starting Condition for sampling n° {i} is exactly the same value for Q00 and Q01 in State 0')
+
+            if df['Q3'][0] > df['Q4'][0]:
+                print(f'Starting Condition for sampling n° {i} is cooperating in State 1')
+            elif df['Q3'][0] < df['Q4'][0]:
+                print(f'Starting Condition for sampling n° {i} is defecting in State 1')
+            else:
+                print(f'Starting Condition for sampling n° {i} is exactly the same value for Q10 and Q11 in State 1')
+    
+    def plot_value_iteration(self, Q00, Q01, Q10, Q11, starting_point_print=False):
+        """
+        Plot value iteration results for the Prisoner's Dilemma.
+
+        Parameters:
+            Q00, Q01, Q10, Q11: Theoretical Q-values for each state-action pair.
+            starting_point_print: Whether to print starting values of Q-values.
+        """
+        qval_inner_value_iteration = self.check_value_iteration()
+        dfs = convert_dict_to_mean_df(qval_inner_value_iteration, mean=False)
+        mean_df = convert_dict_to_mean_df(qval_inner_value_iteration, mean=True)
+
+        fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+
+        self.plot_values(axs[0, 0], dfs, mean_df, Q00, 'Q1', ':', 'solid',
+                    "Q1: Action 0, State 0: Q-values across different initializations",
+                    "Iteration", "Q-value", starting_point_print)
+
+        self.plot_values(axs[0, 1], dfs, mean_df, Q01, 'Q2', ':', 'solid',
+                    "Q2: Action 1, State 0: Q-values across different initializations",
+                    "Iteration", "Q-value", starting_point_print)
+
+        self.plot_values(axs[1, 0], dfs, mean_df, Q10, 'Q3', ':', 'solid',
+                    "Q3: Action 0, State 1: Q-values across different initializations",
+                    "Iteration", "Q-value", starting_point_print)
+
+        self.plot_values(axs[1, 1], dfs, mean_df, Q11, 'Q4', ':', 'solid',
+                    "Q4: Action 1, State 1: Q-values across different initializations",
+                    "Iteration", "Q-value", starting_point_print)
+
+        if starting_point_print:
+            self.print_starting_conditions(dfs)
+
+        plt.tight_layout()
+        plt.show()
+
     @staticmethod
     def plot_q_values(q1_history_per_sample):
         q1_history = convert_dict_to_mean_df(q1_history_per_sample, mean=True)

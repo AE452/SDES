@@ -78,8 +78,6 @@ def convert_dict_to_mean_df(data_dict, mean = True):
         return dfs
 
 
-
-
 def generate_unique_2x2():
     # Generate a 2x2 array with random values
     array = np.random.rand(2, 2)
@@ -89,6 +87,32 @@ def generate_unique_2x2():
         array = np.random.rand(2, 2)
     
     return array
+
+
+def generate_unique_complete_samplings(T, delta):
+    """
+    Generate a 2x2 array with random values in the range [0, T / (1 - delta)]
+    ensuring that all values are distinct when rounded to one decimal place.
+    
+    Parameters:
+        T (float): Upper limit factor.
+        delta (float): Factor to adjust the range.
+        
+    Returns:
+        np.ndarray: A 2x2 array with unique rounded values.
+    """
+    # Calculate the upper limit
+    upper_limit = T / (1 - delta)
+    
+    # Generate a 2x2 array with random values in the range [0, upper_limit]
+    array = np.random.uniform(0, upper_limit, (2, 2))
+    
+    # Ensure the values are distinct when rounded to one decimal place
+    while len(np.unique(array.round(1))) < 4:
+        array = np.random.uniform(0, upper_limit, (2, 2))
+    
+    return array
+
 
 def latin_hypercube_sampling():
     
@@ -140,11 +164,10 @@ class PrisonersDilemmaSolver:
             q1_history = []
             grim_trigger_count = 0
 
-            # Reset and reinitialize q1
             if self.random_uniform:
                 q1 = generate_unique_2x2()
             else:
-                q1 = latin_hypercube_sampling()
+                q1 = generate_unique_complete_samplings(1, self.delta)
 
             # Store initial values
             initial_q_value.append(q1.copy())
@@ -179,7 +202,10 @@ class PrisonersDilemmaSolver:
                                     self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
 
                 for k in range(self.K):
-                    q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                    
+                    #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                    q1_max = np.max(q1_val, axis=0)
+
                     q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                     q1_new = r1_pi2 + self.delta * q1_new
                     q1_val = q1_new.copy()
@@ -261,7 +287,7 @@ class PrisonersDilemmaSolver:
             if self.random_uniform:
                 q1 = generate_unique_2x2()
             else:
-                q1 = latin_hypercube_sampling()
+                q1 = generate_unique_complete_samplings(1, self.delta)
             
             q1_val = q1.copy()
             triggered_defection = False  # Used for Grim Trigger
@@ -290,7 +316,9 @@ class PrisonersDilemmaSolver:
                                 self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
 
             for k in range(self.K):
-                q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
+                q1_max = np.max(q1_val, axis=0)
+
                 q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                 q1_new = r1_pi2 + self.delta * q1_new
                 q1_val = q1_new.copy()

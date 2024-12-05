@@ -309,10 +309,10 @@ class PrisonersDilemmaSolver:
                 pi2 = pi2.reshape(2, 2)
 
                 r1_pi2 = np.dot(self.r1, pi2)
-                P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
-                                    self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
-                P1_D_pi2 = np.array([self.P_DC[0] * pi2[0, 0] + self.P_DD[0] * pi2[1, 0], 
-                                    self.P_DC[1] * pi2[0, 1] + self.P_DD[1] * pi2[1, 1]])
+                P1_C_pi2 = np.array([self.P_CC[0, :] * pi2[0, 0] + self.P_CD[0,:] * pi2[1, 0], 
+                                    self.P_CC[1,:] * pi2[0, 1] + self.P_CD[1,:] * pi2[1, 1]])
+                P1_D_pi2 = np.array([self.P_DC[0,:] * pi2[0, 0] + self.P_DD[0,:] * pi2[1, 0], 
+                                    self.P_DC[1,:] * pi2[0, 1] + self.P_DD[1,:] * pi2[1, 1]])
 
                 for k in range(self.K):
                     

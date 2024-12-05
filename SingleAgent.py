@@ -26,10 +26,10 @@ class epsilon_GrimTrigger:
     def get_action(self, epsilon_value):
         """Determine action based on Q-values."""
         # Cooperate if Q_cooperate > Q_defect, otherwise defect
-        return np.array([np.array([1-epsilon_value/2, epsilon_value/2]), np.array([epsilon_value/2, 1-epsilon_value/2])]) 
+        return np.array([[1-epsilon_value/2, epsilon_value/2], [epsilon_value/2, 1-epsilon_value/2]]) 
     
 class Theoretical_QValueCalculator:
-    def __init__(self, epsilon, P, R, T, S):
+    def __init__(self, epsilon, P, R, T, S,delta):
         """
         Initialize the QValueCalculator with game parameters.
         
@@ -45,34 +45,38 @@ class Theoretical_QValueCalculator:
         self.R = R
         self.T = T
         self.S = S
+        self.delta = delta
 
-    def calculate_q_values_eGT(self, delta):
-        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - delta)
-        numerator_Q00 = (1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * delta * Q11
-        denominator_Q00 = 1 - (1 - self.epsilon / 2) * delta
+    def calculate_q_values_eGT(self):
+        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - self.delta)
+        numerator_Q00 = (1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q11
+        denominator_Q00 = 1 - (1 - self.epsilon / 2) * self.delta
         Q00 = numerator_Q00 / denominator_Q00
-        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + delta * Q11
-        Q01 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * delta * Q00
+        Q01 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
+        Q10 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * self.delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00
 
         return Q00, Q01, Q10, Q11
 
-    def calculate_q_values_eAD(self, delta):
-        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - delta)
-        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + delta * Q11
-        Q01 = ((1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * delta * Q11 + (self.epsilon / 2) * self.R) / (1 - delta)
-        Q00 = (1 - self.epsilon / 2) * self.R + ((1 - self.epsilon / 2) * delta * Q01) + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * delta * Q11)
+    def calculate_q_values_eAD(self):
+        Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - self.delta)
+        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
+        Q01 = (((1 - self.epsilon / 2)*self.S )+ ((1 - self.epsilon / 2)*self.delta*Q11) + ((self.epsilon / 2) * self.R ))/((1-self.epsilon/2)*self.delta)
+        Q00 = ((1 - self.epsilon / 2)*self.R) + ((1 - self.epsilon / 2)*self.delta*Q01) + ((self.epsilon / 2) * self.S) + ((self.epsilon / 2) * self.delta * Q11)
 
         return Q00, Q01, Q10, Q11
 
-    def calculate_q_values_eAC(self, delta):
-        Q10 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) / (1 - delta)
-        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + delta * Q10
-        Q00 = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * delta * Q10)) / (1 - (1 - self.epsilon / 2) * delta)
-        Q01 = (1 - self.epsilon / 2) * self.S + ((1 - self.epsilon / 2) * delta * Q10) + (self.epsilon / 2) * self.R + (self.epsilon / 2) * delta * Q00
+    def calculate_q_values_eAC(self):
+        Q10 = ((1 - self.epsilon / 2) * self.S + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00)/(1-(1-self.epsilon/2)*self.delta)
+
+        Q01 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) + self.delta * Q10
+
+        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + (self.delta * Q10)
+        
+        Q00 = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * self.delta * Q10)) / (1 - (1 - self.epsilon / 2) * self.delta)
 
         return Q00, Q01, Q10, Q11
 
-    def calculate_q_values(self, delta, c1, c2):
+    def calculate_q_values(self, c1, c2):
         """
         Calculate the Q-values based on the range of delta.
         
@@ -84,12 +88,12 @@ class Theoretical_QValueCalculator:
         Returns:
             tuple: Q-values (Q00, Q01, Q10, Q11).
         """
-        if delta < c1:
-            return self.calculate_q_values_eAD(delta)
-        elif c1 <= delta <= c2:
-            return self.calculate_q_values_eGT(delta)
+        if self.delta < c1:
+            return self.calculate_q_values_eAD()
+        elif c1 <= self.delta <= c2:
+            return self.calculate_q_values_eGT()
         else:
-            return self.calculate_q_values_eAC(delta)
+            return self.calculate_q_values_eAC()
       
 class TitForTat:
     """Tit-for-Tat strategy: Cooperate initially, then copy opponent's last move."""
@@ -148,7 +152,6 @@ def generate_unique_2x2():
     
     return array
 
-
 def generate_unique_complete_samplings(T, delta):
     """
     Generate a 2x2 array with random values in the range [0, T / (1 - delta)]
@@ -173,11 +176,11 @@ def generate_unique_complete_samplings(T, delta):
     
     return array
 
-
-def latin_hypercube_sampling():
+def latin_hypercube_sampling(T, delta):
     
-    sampler = qmc.LatinHypercube(d=4)
-    sample = sampler.random(n=1)
+    upper_limit = T / (1 - delta)
+    sampler = qmc.LatinHypercube(d=1)
+    sample = sampler.random(n=4)
     unique_2x2_array = sample.reshape(2, 2)
     while len(np.unique(unique_2x2_array)) < 4:
         sample = sampler.random(n=1)
@@ -199,6 +202,47 @@ def create_line(value, length=10):
     return [value for _ in range(length)]
 
 
+class Game_Model_Structure:
+    def __init__(self, S=2, A=2, DC=1, CC=0.8, DD=0.2, CD=0):
+        """
+        Initialize the game model with custom parameters.
+
+        Parameters:
+        - S (int): Number of states
+        - A (int): Number of actions
+        - DC (float): Reward for (D, C)
+        - CC (float): Reward for (C, C)
+        - DD (float): Reward for (D, D)
+        - CD (float): Reward for (C, D)
+        """
+        self.S = S
+        self.A = A
+        self.DC = DC
+        self.CC = CC
+        self.DD = DD
+        self.CD = CD
+        
+        # Create the reward matrix
+        self.r1 = np.array([[self.CC, self.CD], [self.DC, self.DD]])
+        
+        # Define the probability matrices
+        self.P_CC = np.array([[1, 0], [1, 0]])
+        self.P_CD = np.array([[0, 1], [0, 1]])
+        self.P_DC = self.P_CD  # Same as P_CD
+        self.P_DD = self.P_CD  # Same as P_CD
+
+    def get_probability_matrices(self):
+        """
+        Returns the probability matrices P_CC, P_CD, P_DC, P_DD.
+        """
+        return self.P_CC, self.P_CD, self.P_DC, self.P_DD
+
+    def get_reward_matrix(self):
+        """
+        Returns the reward matrix.
+        """
+        return self.r1
+
 
 
 class PrisonersDilemmaSolver:
@@ -217,15 +261,10 @@ class PrisonersDilemmaSolver:
         self.plotting = plotting
         self.check_on_value_iteration = check_on_value_iteration
         self.gt_learned_check = gt_learned_check
-
-        # Define constants for Prisoner's Dilemma
         self.S, self.A = 2, 2
-        self.DC, self.CC, self.DD, self.CD = 1, 0.8, 0.2, 0
-        self.r1 = np.array([[self.CC, self.CD], [self.DC, self.DD]])
-        self.P_CC = np.array([[1, 0], [1, 0]])
-        self.P_CD = np.array([[0, 1], [0, 1]])
-        self.P_DC = self.P_CD
-        self.P_DD = self.P_CD
+        game_structure = Game_Model_Structure(self.S, self.A, 1, 0.8, 0.2, 0)
+        self.P_CC, self.P_CD, self.P_DC, self.P_DD = game_structure.get_probability_matrices()
+        self.r1 = game_structure.get_reward_matrix()
 
     def run(self):
         q1_history_per_sample = {}
@@ -239,7 +278,7 @@ class PrisonersDilemmaSolver:
             grim_trigger_count = 0
 
             if self.random_uniform:
-                q1 = generate_unique_2x2()
+                q1 = latin_hypercube_sampling(1, self.delta)
             else:
                 q1 = generate_unique_complete_samplings(1, self.delta)
 
@@ -279,9 +318,8 @@ class PrisonersDilemmaSolver:
                     
                     #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                     q1_max = np.max(q1_val, axis=0)
-
                     q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-                    q1_new = r1_pi2 + self.delta * q1_new
+                    q1_new = r1_pi2 + self.delta * q1_new.copy()
                     q1_val = q1_new.copy()
 
                 
@@ -358,7 +396,7 @@ class PrisonersDilemmaSolver:
         for m in range(self.M):
             q_list = []
             if self.random_uniform:
-                q1 = generate_unique_2x2()
+                q1 = latin_hypercube_sampling(1, self.delta)
             else:
                 q1 = generate_unique_complete_samplings(1, self.delta)
             
@@ -380,8 +418,6 @@ class PrisonersDilemmaSolver:
                 raise ValueError("Unsupported strategy")
 
             # Ensure pi2 is 2x2 for matrix multiplication
-            pi2 = pi2.reshape(2, 2)
-
             r1_pi2 = np.dot(self.r1, pi2)
             P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
                                 self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
@@ -423,6 +459,9 @@ class PrisonersDilemmaSolver:
                 print(f"Starting {column} for sampling {i} is {df[column][0]}")
             ax.plot(df[column], linestyle='--', label=f"{column} - Iteration {i+1}")
         ax.plot(mean_df[column], linestyle=linestyle_mean, label=f"{column} mean")
+        upper_limit = 1 / (1 - self.delta) #change: insert T as input
+
+        ax.set_ylim([0, upper_limit])
         ax.plot(create_line(theoretical_value, len(mean_df)), linestyle=linestyle_theoretical, label=f"Theoretical {column}")
 
         ax.set_title(title)

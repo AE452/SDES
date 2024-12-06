@@ -26,7 +26,7 @@ class epsilon_GrimTrigger:
     def get_action(self, epsilon_value):
         """Determine action based on Q-values."""
         # Cooperate if Q_cooperate > Q_defect, otherwise defect
-        return np.array([[1-epsilon_value/2, epsilon_value/2], [epsilon_value/2, 1-epsilon_value/2]]) 
+        return np.array([[1-epsilon_value/2, epsilon_value/2], [epsilon_value/2, 1-epsilon_value/2]])
     
 class Theoretical_QValueCalculator:
     def __init__(self, epsilon, P, R, T, S,delta):
@@ -243,8 +243,6 @@ class Game_Model_Structure:
         """
         return self.r1
 
-
-
 class PrisonersDilemmaSolver:
     def __init__(self, strategy, e_initial, lambda_val, alpha, delta, K, M, e_decay, random_uniform=True, error_stop='any', verbose=False, plotting = True, check_on_value_iteration = False, gt_learned_check = False):
         self.strategy = strategy
@@ -297,7 +295,7 @@ class PrisonersDilemmaSolver:
                                     self.strategy.get_action(triggered_defection)]).T
                     
                 elif isinstance(self.strategy, epsilon_GrimTrigger):
-                    pi2 = self.strategy.get_action(epsilon_value=e)
+                    pi2 = self.strategy.get_action(epsilon_value=e).T
 
                 elif isinstance(self.strategy, TitForTat):
                     pi2 = np.array([self.strategy.get_action(previous_action),
@@ -306,7 +304,6 @@ class PrisonersDilemmaSolver:
                     raise ValueError("Unsupported strategy")
 
                 # Ensure pi2 is 2x2 for matrix multiplication
-                pi2 = pi2.reshape(2, 2)
 
                 r1_pi2 = np.dot(self.r1, pi2)
                 P1_C_pi2 = np.array([self.P_CC[0, :] * pi2[0, 0] + self.P_CD[0,:] * pi2[1, 0], 
@@ -318,7 +315,7 @@ class PrisonersDilemmaSolver:
                     
                     #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                     q1_max = np.max(q1_val, axis=0)
-                    q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
+                    q1_new = np.array((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
                     q1_new = r1_pi2 + self.delta * q1_new.copy()
                     q1_val = q1_new.copy()
 
@@ -401,23 +398,13 @@ class PrisonersDilemmaSolver:
                 q1 = generate_unique_complete_samplings(1, self.delta)
             
             q1_val = q1.copy()
-            triggered_defection = False  # Used for Grim Trigger
-            previous_action = np.array([1, 0])
-            
-            if isinstance(self.strategy, GrimTrigger_Simple):
-                pi2 = np.array([self.strategy.get_action(triggered_defection), 
-                                self.strategy.get_action(triggered_defection)]).T
                 
-            elif isinstance(self.strategy, epsilon_GrimTrigger):
-                pi2 = self.strategy.get_action(epsilon_value=e)
+            if isinstance(self.strategy, epsilon_GrimTrigger):
+                pi2 = self.strategy.get_action(epsilon_value=e) #if you transpose or not it remains identical because it is a symmetric matrix
 
-            elif isinstance(self.strategy, TitForTat):
-                pi2 = np.array([self.strategy.get_action(previous_action),
-                                self.strategy.get_action(previous_action)]).T
             else:
                 raise ValueError("Unsupported strategy")
 
-            # Ensure pi2 is 2x2 for matrix multiplication
             r1_pi2 = np.dot(self.r1, pi2)
             P1_C_pi2 = np.array([self.P_CC[0] * pi2[0, 0] + self.P_CD[0] * pi2[1, 0], 
                                 self.P_CC[1] * pi2[0, 1] + self.P_CD[1] * pi2[1, 1]])
@@ -429,8 +416,8 @@ class PrisonersDilemmaSolver:
                 q1_max = np.max(q1_val, axis=0)
 
                 q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-                q1_new = r1_pi2 + self.delta * q1_new
-                q1_val = q1_new.copy()
+                q1_new_1 = r1_pi2 + self.delta * q1_new.copy()
+                q1_val = q1_new_1.copy()
                 q_list.append(q1_val)
             qval_inner_value_iteration[m]= q_list
 
@@ -461,7 +448,7 @@ class PrisonersDilemmaSolver:
         ax.plot(mean_df[column], linestyle=linestyle_mean, label=f"{column} mean")
         upper_limit = 1 / (1 - self.delta) #change: insert T as input
 
-        ax.set_ylim([0, upper_limit])
+        #ax.set_ylim([0, upper_limit])
         ax.plot(create_line(theoretical_value, len(mean_df)), linestyle=linestyle_theoretical, label=f"Theoretical {column}")
 
         ax.set_title(title)

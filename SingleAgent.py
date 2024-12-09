@@ -52,29 +52,46 @@ class Theoretical_QValueCalculator:
         numerator_Q00 = (1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q11
         denominator_Q00 = 1 - (1 - self.epsilon / 2) * self.delta
         Q00 = numerator_Q00 / denominator_Q00
-        Q01 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
-        Q10 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * self.delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00
+        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
+        Q01 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * self.delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00
 
         return Q00, Q01, Q10, Q11
 
     def calculate_q_values_eAD(self):
         Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - self.delta)
-        Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
-        Q01 = (((1 - self.epsilon / 2)*self.S )+ ((1 - self.epsilon / 2)*self.delta*Q11) + ((self.epsilon / 2) * self.R ))/((1-self.epsilon/2)*self.delta)
+        Q01 = ((1 - self.epsilon / 2) * self.T )+ ((self.epsilon / 2) * self.P )+ (self.delta * Q11)
+        Q10 = (((1 - self.epsilon / 2)*self.S )+ ((1 - self.epsilon / 2)*self.delta*Q11) + ((self.epsilon / 2) * self.R ))/((1-self.epsilon/2)*self.delta)
         Q00 = ((1 - self.epsilon / 2)*self.R) + ((1 - self.epsilon / 2)*self.delta*Q01) + ((self.epsilon / 2) * self.S) + ((self.epsilon / 2) * self.delta * Q11)
 
-        return Q00, Q01, Q10, Q11
+        return Q00, Q10, Q01, Q11
 
     def calculate_q_values_eAC(self):
-        Q10 = ((1 - self.epsilon / 2) * self.S + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00)/(1-(1-self.epsilon/2)*self.delta)
+    # Initial guesses for Q00 and Q10
+        Q00 = 0  # initial guess for Q00
+        Q10 = 0  # initial guess for Q10
+        tol=1e-6
+        # Iterative approach to update Q00 and Q10 until convergence
+        for _ in range(100):
+            # Update Q10 based on the current Q00
+            Q10_new = ((1 - self.epsilon / 2) * self.S + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00) / (1 - (1 - self.epsilon / 2) * self.delta)
 
+            # Update Q00 based on the current Q10
+            Q00_new = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q10_new) / (1 - (1 - self.epsilon / 2) * self.delta)
+
+            # Check for convergence
+            if abs(Q10_new - Q10) < tol and abs(Q00_new - Q00) < tol:
+                break
+            
+            # Update Q00 and Q10 for the next iteration
+            Q00 = Q00_new
+            Q10 = Q10_new
+
+        # Once converged, calculate Q01 and Q11
         Q01 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) + self.delta * Q10
+        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + self.delta * Q10
 
-        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + (self.delta * Q10)
-        
-        Q00 = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + ((self.epsilon / 2) * self.delta * Q10)) / (1 - (1 - self.epsilon / 2) * self.delta)
+        return Q00, Q10, Q01, Q11
 
-        return Q00, Q01, Q10, Q11
 
     def calculate_q_values(self, c1, c2):
         """
@@ -305,7 +322,7 @@ class PrisonersDilemmaSolver:
 
                 # Ensure pi2 is 2x2 for matrix multiplication
 
-                r1_pi2 = np.dot(self.r1, pi2)
+                r1_pi2 = np.dot(self.r1, pi2.T)
                 P1_C_pi2 = np.array([self.P_CC[0, :] * pi2[0, 0] + self.P_CD[0,:] * pi2[1, 0], 
                                     self.P_CC[1,:] * pi2[0, 1] + self.P_CD[1,:] * pi2[1, 1]])
                 P1_D_pi2 = np.array([self.P_DC[0,:] * pi2[0, 0] + self.P_DD[0,:] * pi2[1, 0], 
@@ -315,7 +332,12 @@ class PrisonersDilemmaSolver:
                     
                     #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                     q1_max = np.max(q1_val, axis=0)
-                    q1_new = np.array((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
+                    q1_new = np.zeros((2, 2))
+                    q1_new[0, 0] = np.dot(P1_C_pi2[0, :], q1_max)
+                    q1_new[0, 1] = np.dot(P1_C_pi2[1, :], q1_max)
+                    q1_new[1, 0] = np.dot(P1_D_pi2[0, :], q1_max)
+                    q1_new[1, 1] = np.dot(P1_D_pi2[1, :], q1_max)
+
                     q1_new = r1_pi2 + self.delta * q1_new.copy()
                     q1_val = q1_new.copy()
 
@@ -330,14 +352,6 @@ class PrisonersDilemmaSolver:
                     error = np.any(np.abs(q1_val - q1) > 1e-5)
                 elif self.error_stop == 'mean':
                     error = np.mean(np.abs(q1_val - q1)) > 1e-5
-
-                # After loop
-                # Check for convergence
-                if self.error_stop == 'any':
-                    error = np.any(np.abs(q1_val - q1) > 1e-5)
-                elif self.error_stop == 'mean':
-                    error = np.mean(np.abs(q1_val - q1)) > 1e-5
-                
                 e *= self.e_decay
 
 
@@ -414,10 +428,17 @@ class PrisonersDilemmaSolver:
             for k in range(self.K):
                 #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                 q1_max = np.max(q1_val, axis=0)
+                q1_new = np.zeros((2, 2))
+                q1_new[0, 0] = np.dot(P1_C_pi2[0], q1_max)
+                q1_new[0, 1] = np.dot(P1_C_pi2[1], q1_max)
+                q1_new[1, 0] = np.dot(P1_D_pi2[0], q1_max)
+                q1_new[1, 1] = np.dot(P1_D_pi2[1], q1_max)
 
-                q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-                q1_new_1 = r1_pi2 + self.delta * q1_new.copy()
-                q1_val = q1_new_1.copy()
+                # Final update to q1_new
+                q1_new = r1_pi2 + self.delta * q1_new.copy()
+                #q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
+                #q1_new_1 = r1_pi2 + self.delta * q1_new.copy()
+                q1_val = q1_new.copy()
                 q_list.append(q1_val)
             qval_inner_value_iteration[m]= q_list
 

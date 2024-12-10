@@ -55,42 +55,39 @@ class Theoretical_QValueCalculator:
         Q10 = (1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P + self.delta * Q11
         Q01 = (1 - self.epsilon / 2) * self.S + (1 - self.epsilon / 2) * self.delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00
 
-        return Q00, Q01, Q10, Q11
+        return Q00, Q01, Q10, Q11 # the order should remain this always but pay attention that q01 means cooperating in state 1
+
 
     def calculate_q_values_eAD(self):
         Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - self.delta)
-        Q01 = ((1 - self.epsilon / 2) * self.T )+ ((self.epsilon / 2) * self.P )+ (self.delta * Q11)
-        Q10 = (((1 - self.epsilon / 2)*self.S )+ ((1 - self.epsilon / 2)*self.delta*Q11) + ((self.epsilon / 2) * self.R ))/((1-self.epsilon/2)*self.delta)
-        Q00 = ((1 - self.epsilon / 2)*self.R) + ((1 - self.epsilon / 2)*self.delta*Q01) + ((self.epsilon / 2) * self.S) + ((self.epsilon / 2) * self.delta * Q11)
+        Q10 = (1 - self.epsilon / 2)*self.T + (self.epsilon / 2) * self.P + self.delta * Q11
+        Q01 = (1 - self.epsilon / 2)*self.S + (1 - self.epsilon / 2)*self.delta * Q11 + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q10
+        Q00 = ((1 - self.epsilon / 2)*self.R) + ((1 - self.epsilon / 2)*self.delta*Q10) + ((self.epsilon / 2) * self.S) + ((self.epsilon / 2) * self.delta * Q11)
 
-        return Q00, Q10, Q01, Q11
+        return Q00, Q01, Q10, Q11 # the order should remain this always but pay attention that q01 means cooperating in state 1
 
     def calculate_q_values_eAC(self):
-    # Initial guesses for Q00 and Q10
         Q00 = 0  # initial guess for Q00
-        Q10 = 0  # initial guess for Q10
+        Q01 = 0  # initial guess for Q10
         tol=1e-6
         # Iterative approach to update Q00 and Q10 until convergence
         for _ in range(100):
-            # Update Q10 based on the current Q00
-            Q10_new = ((1 - self.epsilon / 2) * self.S + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00) / (1 - (1 - self.epsilon / 2) * self.delta)
+            Q01_new = ((1 - self.epsilon / 2) * self.S + (self.epsilon / 2) * self.R + (self.epsilon / 2) * self.delta * Q00) / (1 - (1 - self.epsilon / 2) * self.delta)
 
-            # Update Q00 based on the current Q10
-            Q00_new = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q10_new) / (1 - (1 - self.epsilon / 2) * self.delta)
+            Q00_new = ((1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q01_new) / (1 - (1 - self.epsilon / 2) * self.delta)
 
             # Check for convergence
-            if abs(Q10_new - Q10) < tol and abs(Q00_new - Q00) < tol:
+            if abs(Q01_new - Q01) < tol and abs(Q00_new - Q00) < tol:
                 break
             
             # Update Q00 and Q10 for the next iteration
             Q00 = Q00_new
-            Q10 = Q10_new
+            Q01 = Q01_new
 
-        # Once converged, calculate Q01 and Q11
-        Q01 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) + self.delta * Q10
-        Q11 = (1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T + self.delta * Q10
+        Q11 = (1 - self.epsilon/2)*self.P + (self.epsilon/2 * self.T) + self.delta * Q01
+        Q10 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) + self.delta * Q01
+        return Q00, Q01, Q10, Q11 # the order should remain this always but pay attention that q01 means cooperating in state 1
 
-        return Q00, Q10, Q01, Q11
 
 
     def calculate_q_values(self, c1, c2):
@@ -106,10 +103,13 @@ class Theoretical_QValueCalculator:
             tuple: Q-values (Q00, Q01, Q10, Q11).
         """
         if self.delta < c1:
+            print('Strategy is e-Always Defecting')
             return self.calculate_q_values_eAD()
         elif c1 <= self.delta <= c2:
+            print('Strategy is e-GrimTrigger')
             return self.calculate_q_values_eGT()
         else:
+            print('Strategy is e-Always Cooperating')
             return self.calculate_q_values_eAC()
       
 class TitForTat:

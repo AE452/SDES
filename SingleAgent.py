@@ -46,7 +46,16 @@ class Theoretical_QValueCalculator:
         self.T = T
         self.S = S
         self.delta = delta
+    
+    def calculate_c1_c2(self):
+        # Calculate c1 and c2
+        epsilon_value = self.epsilon
+        P, R, T, S = self.P, self.R, self.T, self.S
 
+        c2 = ((2*P) - (epsilon_value *P) - (epsilon_value *R) - (2 *S) + (epsilon_value *S) + (epsilon_value *T))/((-1 + epsilon_value) *((-2 *P) + (2 *epsilon_value *P) + (2 *S) - (epsilon_value *S) - (epsilon_value *T)))
+        c1 = (-epsilon_value *P + 2 *R - epsilon_value *R + epsilon_value *S - 2 *T + epsilon_value *T)/((-1 + epsilon_value)* (-2 *P + 2 *epsilon_value *P - epsilon_value *S + 2 *T - epsilon_value *T))
+
+        return c1, c2
     def calculate_q_values_eGT(self):
         Q11 = ((1 - self.epsilon / 2) * self.P + (self.epsilon / 2) * self.T) / (1 - self.delta)
         numerator_Q00 = (1 - self.epsilon / 2) * self.R + (self.epsilon / 2) * self.S + (self.epsilon / 2) * self.delta * Q11
@@ -88,8 +97,6 @@ class Theoretical_QValueCalculator:
         Q10 = ((1 - self.epsilon / 2) * self.T + (self.epsilon / 2) * self.P) + self.delta * Q01
         return Q00, Q01, Q10, Q11 # the order should remain this always but pay attention that q01 means cooperating in state 1
 
-
-
     def calculate_q_values(self, c1, c2):
         """
         Calculate the Q-values based on the range of delta.
@@ -111,6 +118,16 @@ class Theoretical_QValueCalculator:
         else:
             print('Strategy is e-Always Cooperating')
             return self.calculate_q_values_eAC()
+        
+    def print_strategy_chosen(self, c1, c2):
+        if self.delta < c1:
+            return 1  # e-Always Defecting
+        elif c1 <= self.delta <= c2:
+            return 2  # e-GrimTrigger
+        else:
+            return 3  # e-Always Cooperating
+
+
       
 class TitForTat:
     """Tit-for-Tat strategy: Cooperate initially, then copy opponent's last move."""
@@ -333,11 +350,12 @@ class PrisonersDilemmaSolver:
                     #q1_max = (1 - e) * np.max(q1_val, axis=0) + e * np.mean(q1_val, axis=0)
                     q1_max = np.max(q1_val, axis=0)
                     q1_new = np.zeros((2, 2))
-                    q1_new[0, 0] = np.dot(P1_C_pi2[0, :], q1_max)
-                    q1_new[0, 1] = np.dot(P1_C_pi2[1, :], q1_max)
-                    q1_new[1, 0] = np.dot(P1_D_pi2[0, :], q1_max)
-                    q1_new[1, 1] = np.dot(P1_D_pi2[1, :], q1_max)
+                    q1_new[0, 0] = np.dot(P1_C_pi2[0], q1_max)
+                    q1_new[0, 1] = np.dot(P1_C_pi2[1], q1_max)
+                    q1_new[1, 0] = np.dot(P1_D_pi2[0], q1_max)
+                    q1_new[1, 1] = np.dot(P1_D_pi2[1], q1_max)
 
+                    # Final update to q1_new
                     q1_new = r1_pi2 + self.delta * q1_new.copy()
                     q1_val = q1_new.copy()
 

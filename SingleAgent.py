@@ -417,7 +417,7 @@ class PrisonersDilemmaSolver:
         if self.plotting: 
             self.plot_q_values(q1_history_per_sample)
 
-        return cooperations, defections, q1_history, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict, initial_q_value
+        return cooperations, defections, q1_history_per_sample, convert_dict_to_mean_df(q1_history_per_sample, mean=True), grim_trigger_count_dict, initial_q_value
 
     def check_value_iteration(self):
         qval_inner_value_iteration = {}

@@ -1,5 +1,6 @@
 import numpy as np
 import time
+from utils import *
 
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
@@ -45,36 +46,41 @@ class Algorithm:
     def initialize_q_values(self):
         """Initializes the Q-values randomly."""
         if self.random_uniform:
-            return np.random.rand(self.A, self.S), np.random.rand(self.A, self.S)
+                q1 = latin_hypercube_sampling(1, self.delta)
+                q2 = latin_hypercube_sampling(1, self.delta)
         else:
-            temp1 = np.random.rand()
-            temp2 = temp1 + np.random.rand()
-            temp3 = np.random.rand()
-            temp4 = temp3 + np.random.rand()
-            q1 = np.array([[temp2, temp3], [temp1, temp4]])
+            q1 = generate_unique_complete_samplings(1, self.delta)
+            q2 = generate_unique_complete_samplings(1, self.delta)
 
-            temp1 = np.random.rand()
-            temp2 = temp1 + np.random.rand()
-            temp3 = np.random.rand()
-            temp4 = temp3 + np.random.rand()
-            q2 = np.array([[temp1, temp3], [temp2, temp4]])
+        return q1, q2
 
-            return q1, q2
-
-    def run(self, verbose = False):
+    def run(self, verbose=False):
         """Runs the main algorithm."""
         start_time = time.time()
-        q1_history_per_sample, q2_history_per_sample= {}, {}
+        q1_history_per_sample, q2_history_per_sample = {}, {}
+
         for m in range(self.M):
             q1, q2 = self.initialize_q_values()
             q1_val = q1.copy()
             q2_val = q2.copy()
             q1_history, q2_history = [], []
             error = 1
+            loop_start_time = time.time()
+
             while error:
+                if time.time() - loop_start_time > 1 * 60:
+                    print("Stopping outer while loop due to timeout.")
+                    break
+
                 pi1, pi2 = self.update_policies(q1, q2)
                 q_error = 1
+                q_loop_start_time = time.time()
+
                 while q_error > self.tolerance:
+                    if time.time() - q_loop_start_time > 1 * 60:
+                        print("Stopping inner while loop due to timeout.")
+                        break
+
                     q1_val, q2_val, q_error = self.update_q_values(pi1, pi2, q1_val, q2_val)
 
                 error = np.any(np.abs(q1_val - q1) + np.abs(q2_val - q2) > 1e-3)
@@ -82,15 +88,19 @@ class Algorithm:
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
                 q2 += (np.random.rand() > self.lambda_val) * self.alpha * (q2_val - q2)
                 q1_history.append(q1.copy()) 
-                q2_history.append(q2.copy()) 
+                q2_history.append(q2.copy())
+
             q1_history_per_sample[m] = q1_history.copy()
             q2_history_per_sample[m] = q2_history.copy()
 
             self.eqC[0, m] = np.allclose(pi1, self.state_transition.pi_eqC) and np.allclose(pi2, self.state_transition.pi_eqC)
             self.eqD[0, m] = np.allclose(pi1, self.state_transition.pi_eqD) and np.allclose(pi2, self.state_transition.pi_eqD)
+            
             if verbose:
                 print(self.summary(start_time))
+
         return q1_history_per_sample, q2_history_per_sample
+
 
     def update_policies(self, q1, q2):
         """Updates the policies based on Q-values."""

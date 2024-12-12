@@ -61,19 +61,18 @@ class Algorithm:
 
             return q1, q2
 
-    def run(self):
+    def run(self, verbose = False):
         """Runs the main algorithm."""
         start_time = time.time()
-
+        q1_history_per_sample, q2_history_per_sample= {}, {}
         for m in range(self.M):
             q1, q2 = self.initialize_q_values()
             q1_val = q1.copy()
             q2_val = q2.copy()
-
+            q1_history, q2_history = [], []
             error = 1
             while error:
                 pi1, pi2 = self.update_policies(q1, q2)
-
                 q_error = 1
                 while q_error > self.tolerance:
                     q1_val, q2_val, q_error = self.update_q_values(pi1, pi2, q1_val, q2_val)
@@ -82,11 +81,16 @@ class Algorithm:
 
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
                 q2 += (np.random.rand() > self.lambda_val) * self.alpha * (q2_val - q2)
+                q1_history.append(q1.copy()) 
+                q2_history.append(q2.copy()) 
+            q1_history_per_sample[m] = q1_history.copy()
+            q2_history_per_sample[m] = q2_history.copy()
 
             self.eqC[0, m] = np.allclose(pi1, self.state_transition.pi_eqC) and np.allclose(pi2, self.state_transition.pi_eqC)
             self.eqD[0, m] = np.allclose(pi1, self.state_transition.pi_eqD) and np.allclose(pi2, self.state_transition.pi_eqD)
-
-        return self.summary(start_time)
+            if verbose:
+                print(self.summary(start_time))
+        return q1_history_per_sample, q2_history_per_sample
 
     def update_policies(self, q1, q2):
         """Updates the policies based on Q-values."""
@@ -140,8 +144,4 @@ class Algorithm:
             print("My program took", round(progtime, 2), "seconds to run.")
 
         return result
-    
-#example usage   
-#algo = Algorithm(e=0.1, lambda_val=0.5, alpha=0.1, delta=0.9, random_uniform=True, tolerance=1e-5, M=100, verbose=True)
-#results = algo.run()
-#print("Results:", results)
+

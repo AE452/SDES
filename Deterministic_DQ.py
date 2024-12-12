@@ -1,10 +1,7 @@
 import numpy as np
 import time
 #mordor cluster --> Mathias 
-#hypercube sampling
-#delta small for initialization
-#random = True
-#plot Qvalues and see what is happening, how they change in time
+
 def algorithm(e, lambda_val, alpha,delta, random_uniform,K,M, verbose = False):
     # Number of players, states, and actions
     N = 2

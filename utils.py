@@ -1,5 +1,69 @@
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def plot_analysis(df, fixed_vars, x_var):
+    """
+    Plots P_AD on the x-axis against a specified variable on the y-axis, fixing other variables.
+    
+    Parameters:
+        df (pd.DataFrame): The dataframe containing the data.
+        fixed_vars (dict): Dictionary of variables to fix with their values, e.g., {'alpha': 0.05, 'lambda': 0.05}.
+        x_var (str): The variable to plot on the y-axis.
+    """
+    # Validate inputs
+    if 'P_AD' not in df.columns:
+        raise ValueError("The dataframe must contain the column 'P_AD' for x-axis plotting.")
+    if x_var not in df.columns:
+        raise ValueError(f"The specified y-axis variable '{x_var}' is not in the dataframe.")
+    for var in fixed_vars:
+        if var not in df.columns:
+            raise ValueError(f"The fixed variable '{var}' is not in the dataframe.")
+    
+    # Filter the dataframe based on fixed variables
+    filtered_df = df.copy()
+    for var, value in fixed_vars.items():
+        filtered_df = filtered_df[filtered_df[var] == value]
+    
+    # Check if there is any data left after filtering
+    if filtered_df.empty:
+        print(f"No data available for the specified fixed variables: {fixed_vars}")
+        return
+    
+    # Plot P_AD on the x-axis and x_var on the y-axis
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        filtered_df[x_var], 
+        filtered_df['P_AD'], 
+        marker='o', 
+        label=f"{x_var} vs P_AD"
+    )
+    # Title and labels
+    title = "Fixed Parameters: " + ", ".join(f"{key}={value}" for key, value in fixed_vars.items())
+    plt.title(f"Analysis of {x_var} vs P_AD\n{title}")
+    plt.xlabel(x_var)
+    plt.ylabel('P_AD')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
+def heatmap_mean(df, yaxis, xaxis, value):
+
+    # Pivot the dataframe to create a matrix where 'alpha' and 'lambda' are the indices and columns
+    heatmap_data = df.pivot_table(index=yaxis, columns=xaxis, values=value, aggfunc='mean')
+
+    # Plot the heatmap
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(heatmap_data, cmap='YlGnBu', annot=False, fmt='.2f', cbar_kws={'label': f'Mean {str(value)}'})
+
+    # Set titles and labels
+    plt.title(f'Heatmap of {str(value)} by {str(yaxis)} and {str(xaxis)} (mean of all other params)')
+    plt.xlabel(xaxis)
+    plt.ylabel(yaxis)
+
+    plt.show()
 
 def convert_dict_to_mean_df(data_dict, mean = True):
     dfs = []

@@ -62,7 +62,7 @@ def heatmap_mean(df, yaxis, xaxis, value):
     plt.title(f'Heatmap of {str(value)} by {str(yaxis)} and {str(xaxis)} (mean of all other params)')
     plt.xlabel(xaxis)
     plt.ylabel(yaxis)
-
+    plt.gca().invert_yaxis() 
     plt.show()
 
 def convert_dict_to_mean_df(data_dict, mean = True):

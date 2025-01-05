@@ -70,6 +70,7 @@ class Algorithm:
             while error:
                 if time.time() - loop_start_time > 1 * 60:
                     print("Stopping outer while loop due to timeout.")
+                    #increase 
                     break
 
                 pi1, pi2 = self.update_policies(q1, q2)

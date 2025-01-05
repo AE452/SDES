@@ -61,7 +61,7 @@ def run_simulations(alpha_values, lambda_values, epsilon_values, delta_values, r
     """
     Function to run simulations across parameter combinations.
     """
-    M_value = 100
+    M_value = 100 #reduce
     parameter_combinations = itertools.product(
         alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, [M_value]
     )
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     # Define parameter ranges
     alpha_values = np.linspace(0.01, 1, 100)  # 100 values between 0 and 1
     lambda_values = np.linspace(0.01, 0.995, 100)
-    delta_values = np.linspace(0.01, 0.995, 100)
+    delta_values = np.linspace(0.01, 0.995, 100) #zoom in here with a timelimit higher 
     epsilon_values = np.linspace(0.01, 0.995, 100)
     random_uniform_values = [False]
 

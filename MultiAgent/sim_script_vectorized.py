@@ -1,6 +1,6 @@
 import itertools
 import time
-from MultiAgent_DQ import Algorithm
+from MultiAgent.MultiAgent_DQ import Algorithm
 from utils import convert_dict_to_mean_df
 import pandas as pd
 import numpy as np

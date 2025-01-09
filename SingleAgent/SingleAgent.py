@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import qmc
+import sys
+sys.path.append('../')
 from utils import *
 
 # is the value iteration

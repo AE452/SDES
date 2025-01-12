@@ -278,7 +278,6 @@ if __name__ == "__main__":
     lambda_values = np.linspace(0.01, 0.99, 25)
     delta_values = np.linspace(0.01, 0.99, 25)
     epsilon_values = np.linspace(0.01, 0.8, 25)
-    alpha_values = np.linspace(0.01, 1, 25)
 
 
     # Function to round each linspace value to the nearest multiple of 3

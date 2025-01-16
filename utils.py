@@ -2,6 +2,118 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
+    """
+    Plots multiple lines of P_AD against a specified variable on the x-axis, 
+    with each line representing a unique value of the varying variable.
+    
+    Parameters:
+        df (pd.DataFrame): The dataframe containing the data.
+        fixed_vars (dict): Dictionary of variables to fix with their values, e.g., {'delta': 0.786, 'lambda': 0.132}.
+        x_var (str): The variable to plot on the x-axis.
+        varying_var (str): The variable to vary, creating multiple lines.
+    """
+    # Validate inputs
+    if 'P_AD' not in df.columns:
+        raise ValueError("The dataframe must contain the column 'P_AD' for plotting.")
+    if x_var not in df.columns:
+        raise ValueError(f"The specified x-axis variable '{x_var}' is not in the dataframe.")
+    if varying_var not in df.columns:
+        raise ValueError(f"The specified varying variable '{varying_var}' is not in the dataframe.")
+    for var in fixed_vars:
+        if var not in df.columns:
+            raise ValueError(f"The fixed variable '{var}' is not in the dataframe.")
+    
+    # Filter the dataframe based on fixed variables
+    filtered_df = df.copy()
+    for var, value in fixed_vars.items():
+        filtered_df = filtered_df[filtered_df[var] == value]
+    
+    # Check if there is any data left after filtering
+    if filtered_df.empty:
+        print(f"No data available for the specified fixed variables: {fixed_vars}")
+        return
+    
+    # Get unique values of the varying variable
+    unique_values = sorted(filtered_df[varying_var].unique())    
+    # Normalize unique values for colormap
+    norm = plt.Normalize(min(unique_values), max(unique_values))
+    cmap = cm.get_cmap('viridis')
+    
+    # Plot each unique value as a separate line
+    plt.figure(figsize=(15, 10))
+    for value in unique_values:
+        subset = filtered_df[filtered_df[varying_var] == value]
+        if not subset.empty:
+            plt.plot(
+                subset[x_var], 
+                subset['P_AD'], 
+                marker='o', 
+                label=f"{varying_var}={value:.3f}", 
+                color=cmap(norm(value)),
+            )
+    
+    # Title and labels
+    title = "Fixed Parameters: " + ", ".join(f"{key}={value}" for key, value in fixed_vars.items())
+    plt.title(f"Analysis of {x_var} vs P_AD with Varying {varying_var}\n{title}")
+    plt.xlabel(x_var)
+    plt.ylabel('P_AD')
+    plt.legend(title=varying_var)
+    plt.grid()
+    plt.show()
+
+def plot_analysis_average_and_vary(df, averaging_vars, x_var, varying_var):
+    """
+    Plots multiple lines of P_AD averaged over specified variables against a specified x-axis variable, 
+    with each line representing a unique value of the varying variable.
+    
+    Parameters:
+        df (pd.DataFrame): The dataframe containing the data.
+        averaging_vars (list): List of variables to average over, e.g., ['delta', 'lambda'].
+        x_var (str): The variable to plot on the x-axis.
+        varying_var (str): The variable to vary, creating multiple lines.
+    """
+    # Validate inputs
+    if 'P_AD' not in df.columns:
+        raise ValueError("The dataframe must contain the column 'P_AD' for plotting.")
+    if x_var not in df.columns:
+        raise ValueError(f"The specified x-axis variable '{x_var}' is not in the dataframe.")
+    if varying_var not in df.columns:
+        raise ValueError(f"The specified varying variable '{varying_var}' is not in the dataframe.")
+    for var in averaging_vars:
+        if var not in df.columns:
+            raise ValueError(f"The averaging variable '{var}' is not in the dataframe.")
+    
+    # Group by the x_var and varying_var, averaging over the averaging_vars
+    grouped = df.groupby([x_var, varying_var]).mean(numeric_only=True).reset_index()
+    
+    # Get unique values of the varying variable
+    unique_values = sorted(grouped[varying_var].unique())
+    norm = plt.Normalize(min(unique_values), max(unique_values))
+    cmap = cm.get_cmap('viridis')
+    # Plot each unique value as a separate line
+    plt.figure(figsize=(15, 10))
+    for value in unique_values:
+        subset = grouped[grouped[varying_var] == value]
+        if not subset.empty:
+            plt.plot(
+                subset[x_var], 
+                subset['P_AD'], 
+                marker='o', 
+                label=f"{varying_var}={value:.3f}", 
+                color=cmap(norm(value)),
+            )
+    
+    # Title and labels
+    title = "Averaged Over: " + ", ".join(averaging_vars)
+    plt.title(f"Analysis of {x_var} vs P_AD with Varying {varying_var}\n{title}")
+    plt.xlabel(x_var)
+    plt.ylabel('P_AD')
+    plt.legend(title=varying_var)
+    plt.grid()
+    plt.show()
+
 
 def plot_analysis(df, fixed_vars, x_var):
     """

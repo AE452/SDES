@@ -3,7 +3,27 @@ from itertools import product
 from scipy.optimize import fsolve
 import sys
 import copy
+"""
+Dynamic Pricing and Demand Evolution Model
+How It Works:
+Initialization:
 
+Prices start at a default value.
+Demand and profits are calculated for the initial state.
+Dynamic Updates:
+
+Demand: A weighted average of past demand and current demand based on prices.
+Prices: Adjusted using a gradient-based rule, ensuring firms learn from demand/profit signals.
+Profits: Computed at each step using the updated prices and demand.
+Simulation Loop:
+
+The process is repeated for a fixed number of time steps (tmax).
+
+
+Results:
+
+At the end of the simulation, the final prices, demand, and profits reflect a steady state (if equilibrium is reached).
+"""
 
 class IRP(object):
     """

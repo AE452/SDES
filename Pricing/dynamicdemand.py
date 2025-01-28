@@ -227,6 +227,7 @@ class IRP(object):
         """
         p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
         return  p_competitive, p_monopoly
+
 class IRP_Dynamic(IRP):
     def __init__(self, dem_function='default', **kwargs):
         super().__init__(dem_function, **kwargs)

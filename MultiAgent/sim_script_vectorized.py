@@ -1,6 +1,6 @@
 import itertools
 import time
-from MultiAgent.MultiAgent_DQ import Algorithm
+from MultiAgent_DQ import Algorithm
 from utils import convert_dict_to_mean_df
 import pandas as pd
 import numpy as np
@@ -12,14 +12,14 @@ from gc import collect
 
 #this is the function used
 def run_experiment_chunk_vect(parameter_combinations_chunk):
-    M_value = 50
+    
     results_chunk = []
 
-    for idx, (alpha, lambda_val, e, delta, random_uniform) in enumerate(parameter_combinations_chunk):
+    for idx, (M_value, alpha, lambda_val, e, delta, random_uniform) in enumerate(parameter_combinations_chunk):
         algo = Algorithm(
             e=e, lambda_val=lambda_val, alpha=alpha, delta=delta,
             random_uniform=random_uniform, tolerance=1e-5, 
-            M=M_value, verbose=False
+            M=int(M_value), verbose=False
         )
         q1_history_per_sample, q2_history_per_sample = algo.run()
 
@@ -65,7 +65,7 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
         nonconv = (strategy_df['Strategy_1'] != strategy_df['Strategy_2']).sum()
 
         # Save result
-        results_chunk.append({
+        results_chunk.append({'M': int(M_value),
             'alpha': alpha, 'lambda': lambda_val, 'e': e, 'delta': delta,
             'random_uniform': random_uniform, 'P_AD': P_AD, 'P_GT': P_GT,
             'nonconv': nonconv
@@ -179,11 +179,11 @@ def process_chunk(chunk):
     # Ensure we are generating the correct combinations from the chunk
     return list(itertools.product(*chunk))  # Generates the combinations for this chunk
 
-def generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values):
+def generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M):
     """Generate parameter combinations using multiprocessing."""
     # Split parameters into chunks for parallel processing
     chunks = [
-        (alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
+        (M, alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
     ]
     
     # Create a Pool of worker processes to handle the chunks in parallel
@@ -243,7 +243,7 @@ def run_experiment_with_timeout(comb, time_limit):
     print(f"Skipping combination {comb} after {retries} retries.")
     return None  # Return None if both attempts failed
 
-def run_experiment_a(parameter_combinations, file_path="results_vect1.csv", time_limit=180):
+def run_experiment_a(parameter_combinations, file_path="results_vect_lambda.csv", time_limit=300):
     """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task."""
     
     with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count() // 3) as executor:
@@ -274,10 +274,11 @@ def run_experiment_a(parameter_combinations, file_path="results_vect1.csv", time
 
 # Test the parallel combination generation
 if __name__ == "__main__":
-    alpha_values = np.linspace(0.01, 1, 25)
+    alpha_values = np.linspace(0.01, 0.5, 3)
     lambda_values = np.linspace(0.01, 0.99, 25)
-    delta_values = np.linspace(0.01, 0.99, 25)
-    epsilon_values = np.linspace(0.01, 0.8, 25)
+    delta_values = np.linspace(0.01, 0.75, 3)
+    epsilon_values = np.linspace(0.01, 0.5, 2)
+    M = np.linspace(100, 10000, 5)
 
 
     # Function to round each linspace value to the nearest multiple of 3
@@ -289,10 +290,12 @@ if __name__ == "__main__":
     lambda_values_rounded = round_to_nearest_multiple(lambda_values, 3)
     delta_values_rounded = round_to_nearest_multiple(delta_values, 3)
     epsilon_values_rounded = round_to_nearest_multiple(epsilon_values, 3)
+    M_rounded = np.round(M)
+
     random_uniform_values = [False]
 
     # Generate parameter combinations in parallel
-    parameter_combinations = generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
+    parameter_combinations = generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M_rounded)
     
     # Run the experiment with the generated combinations
     print(f"Generated {len(parameter_combinations)} combinations.")

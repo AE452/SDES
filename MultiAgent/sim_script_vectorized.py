@@ -131,6 +131,7 @@ def save_results(results_chunk, file_path):
     # Clear memory
     del results_chunk
     collect()
+
 def chunk_generator(iterator, chunk_size):
     """Yield successive chunks of data from an iterator."""
     chunk = []
@@ -208,8 +209,6 @@ def run_experiment_a_old(parameter_combinations, file_path="results_vect1.csv"):
             print(f"\rProgress: {progress:.2f}% ({completed + 1}/{len(parameter_combinations)})", end="")
 
     print("\nProcessing complete.")
-
-
 
 def run_experiment_with_timeout(comb, time_limit):
     """Attempt to run a combination with a retry mechanism."""

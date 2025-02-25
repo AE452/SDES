@@ -70,7 +70,7 @@ class Algorithm:
             loop_start_time = time.time()
 
             while error:
-                if time.time() - loop_start_time > 1 * 60:
+                if time.time() - loop_start_time > 1 * 300:
                     print("Stopping outer while loop due to timeout.")
                     #increase 
                     break
@@ -80,7 +80,7 @@ class Algorithm:
                 q_loop_start_time = time.time()
 
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * 60:
+                    if time.time() - q_loop_start_time > 1 * 300:
                         print("Stopping inner while loop due to timeout.")
                         break
 

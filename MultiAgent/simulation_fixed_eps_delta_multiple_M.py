@@ -92,4 +92,4 @@ if __name__ == "__main__":
     parameter_combinations = list(itertools.product(M_values, alpha_values, lambda_values, epsilon_values, delta_values))
     
     print(f"Generated {len(parameter_combinations)} combinations.")
-    run_experiment(parameter_combinations)
+    run_experiment(parameter_combinations[470:])

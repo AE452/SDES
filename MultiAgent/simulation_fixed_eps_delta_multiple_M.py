@@ -13,6 +13,9 @@ def run_experiment(parameter_combinations, file_path="results_sequential.csv"):
     results = []
     
     for M_value, alpha, lambda_val, e, delta in parameter_combinations:
+        print(f"Running experiment with M={M_value}, alpha={alpha}, lambda={lambda_val}, e={e}, delta={delta}")
+
+        
         algo = Algorithm(
             e=e, lambda_val=lambda_val, alpha=alpha, delta=delta,
             random_uniform=False, tolerance=1e-5, 
@@ -63,29 +66,30 @@ def run_experiment(parameter_combinations, file_path="results_sequential.csv"):
             'alpha': alpha, 'lambda': lambda_val, 'e': e, 'delta': delta,
             'P_AD': P_AD, 'P_GT': P_GT, 'nonconv': nonconv
         })
+        # Append to CSV
+        result_df = pd.DataFrame([{
+            'M': int(M_value),
+            'alpha': alpha, 'lambda': lambda_val, 'e': e, 'delta': delta,
+            'P_AD': P_AD, 'P_GT': P_GT, 'nonconv': nonconv
+        }])
+        result_df.to_csv(file_path, mode='a', header=not os.path.exists(file_path), index=False)
+        print(f"Saved result for M={M_value}, alpha={alpha}, lambda={lambda_val}, e={e}, delta={delta} to {file_path}.")
+        
+        # Force write to disk
+        os.fsync(os.open(file_path, os.O_RDWR))
 
-    # Save results to file
-    results_df = pd.DataFrame(results)
-    results_df.to_csv(file_path, mode='a', header=not os.path.exists(file_path), index=False)
-    print(f"Saved {len(results)} results to {file_path}.")
-    
-    # Clear memory
-    del results
-    gc.collect()
+        # Memory cleanup
+        del result_df
+        gc.collect()
+
 
 if __name__ == "__main__":
     alpha_values = np.linspace(0.01, 0.5, 3)
-    lambda_values = np.linspace(0.01, 0.99, 25)
+    lambda_values = np.linspace(0.01, 0.99, 10)
     M_values = [20, 100, 500, 1000, 5000]
-    
-    epsilon_delta_pairs = [
-        (0.05, 0.95), (0.35, 0.95), (0.6, 0.95),
-        (0.05, 0.75), (0.35, 0.75), (0.6, 0.75),
-        (0.05, 0.5), (0.35, 0.5), (0.6, 0.5),
-        (0.05, 0.35), (0.35, 0.35), (0.6, 0.35)
-    ]
-    
-    parameter_combinations = list(itertools.product(M_values, alpha_values, lambda_values, [e for e, d in epsilon_delta_pairs], [d for e, d in epsilon_delta_pairs]))
+    epsilon_values = [0.05, 0.35, 0.6]
+    delta_values = [0.35, 0.5, 0.75, 0.95]    
+    parameter_combinations = list(itertools.product(M_values, alpha_values, lambda_values, epsilon_values, delta_values))
     
     print(f"Generated {len(parameter_combinations)} combinations.")
     run_experiment(parameter_combinations)

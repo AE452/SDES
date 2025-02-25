@@ -89,11 +89,10 @@ def run_single_simulation(params):
     }
 
 
-def run_simulations(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values):
+def run_simulations(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M_value):
     results = []
 
     # Generate all parameter combinations
-    M_value = 100
     parameter_combinations = list(itertools.product(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, [M_value]))
 
     total_combinations = len(parameter_combinations)
@@ -121,5 +120,6 @@ if __name__ == '__main__':
     delta_values = np.linspace(0.01, 0.995, 500)
     epsilon_values = np.linspace(0.01, 0.995, 500)
     random_uniform_values = [False]
+    M_value
 
-    run_simulations(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
+    run_simulations(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M_value)

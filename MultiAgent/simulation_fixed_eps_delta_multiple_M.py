@@ -84,12 +84,12 @@ def run_experiment(parameter_combinations, file_path="results_sequential.csv"):
 
 
 if __name__ == "__main__":
-    alpha_values = np.linspace(0.01, 0.5, 3)
-    lambda_values = np.linspace(0.01, 0.99, 10)
+    alpha_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959]
+    lambda_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959]
     M_values = [20, 100, 500, 1000, 5000]
     epsilon_values = [0.05, 0.35, 0.6]
     delta_values = [0.35, 0.5, 0.75, 0.95]    
     parameter_combinations = list(itertools.product(M_values, alpha_values, lambda_values, epsilon_values, delta_values))
     
     print(f"Generated {len(parameter_combinations)} combinations.")
-    run_experiment(parameter_combinations[470:])
+    run_experiment(parameter_combinations)

@@ -63,7 +63,7 @@ def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     plt.grid()
     plt.show()
 
-def plot_analysis_average_and_vary(df, averaging_vars, x_var, varying_var):
+def plot_analysis_average_and_vary(df, y_var, averaging_vars, x_var, varying_var):
     """
     Plots multiple lines of P_AD averaged over specified variables against a specified x-axis variable, 
     with each line representing a unique value of the varying variable.
@@ -75,8 +75,8 @@ def plot_analysis_average_and_vary(df, averaging_vars, x_var, varying_var):
         varying_var (str): The variable to vary, creating multiple lines.
     """
     # Validate inputs
-    if 'P_AD' not in df.columns:
-        raise ValueError("The dataframe must contain the column 'P_AD' for plotting.")
+    if y_var not in df.columns:
+        raise ValueError(f"The dataframe must contain the column {y_var} for plotting.")
     if x_var not in df.columns:
         raise ValueError(f"The specified x-axis variable '{x_var}' is not in the dataframe.")
     if varying_var not in df.columns:
@@ -99,7 +99,7 @@ def plot_analysis_average_and_vary(df, averaging_vars, x_var, varying_var):
         if not subset.empty:
             plt.plot(
                 subset[x_var], 
-                subset['P_AD'], 
+                subset[y_var], 
                 marker='o', 
                 label=f"{varying_var}={value:.3f}", 
                 color=cmap(norm(value)),
@@ -109,7 +109,7 @@ def plot_analysis_average_and_vary(df, averaging_vars, x_var, varying_var):
     title = "Averaged Over: " + ", ".join(averaging_vars)
     plt.title(f"Analysis of {x_var} vs P_AD with Varying {varying_var}\n{title}")
     plt.xlabel(x_var)
-    plt.ylabel('P_AD')
+    plt.ylabel(y_var)
     plt.legend(title=varying_var)
     plt.grid()
     plt.show()

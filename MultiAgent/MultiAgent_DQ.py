@@ -1,7 +1,5 @@
 import numpy as np
 import time
-import sys
-sys.path.append('../')
 from utils import *
 
 class PayoffMatrix:
@@ -55,12 +53,13 @@ class Algorithm:
             q2 = generate_unique_complete_samplings(1, self.delta)
 
         return q1, q2
+    
 
     def run(self, verbose=False):
         """Runs the main algorithm."""
         start_time = time.time()
-        q1_history_per_sample, q2_history_per_sample = {}, {}
-
+        q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
+        timeout = 60 if self.M < 500 else 120
         for m in range(self.M):
             q1, q2 = self.initialize_q_values()
             q1_val = q1.copy()
@@ -68,41 +67,65 @@ class Algorithm:
             q1_history, q2_history = [], []
             error = 1
             loop_start_time = time.time()
+            batch_start_time = time.time()
 
+            # Outer loop with timeout
             while error:
-                if time.time() - loop_start_time > 1 * 300:
-                    print("Stopping outer while loop due to timeout.")
-                    #increase 
-                    break
+                if time.time() - loop_start_time > 1 * timeout:  
+                    # Save results even if timeout occurs
+                    q1_history_per_sample[m] = q1_history.copy()
+                    q2_history_per_sample[m] = q2_history.copy()
+
+                    #print("Stopping outer loop due to timeout.")
+                    break  # Exit outer loop if timeout is exceeded
 
                 pi1, pi2 = self.update_policies(q1, q2)
                 q_error = 1
                 q_loop_start_time = time.time()
 
+                # Inner loop with timeout
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * 300:
-                        print("Stopping inner while loop due to timeout.")
-                        break
+                    if time.time() - q_loop_start_time > 1 * timeout:  
+                        #print("Stopping inner loop due to timeout.")
+                        q1_history.append(q1.copy())
+                        q2_history.append(q2.copy())
+                        break  # Exit inner loop if timeout is exceeded
 
+                    # Update Q-values
                     q1_val, q2_val, q_error = self.update_q_values(pi1, pi2, q1_val, q2_val)
 
+                # Check if the outer loop should continue based on q_error condition or timeout
                 error = np.any(np.abs(q1_val - q1) + np.abs(q2_val - q2) > 1e-3)
 
+                # Update Q-values for next iteration of outer loop
                 q1 += (np.random.rand() > self.lambda_val) * self.alpha * (q1_val - q1)
                 q2 += (np.random.rand() > self.lambda_val) * self.alpha * (q2_val - q2)
-                q1_history.append(q1.copy()) 
+                q1_history.append(q1.copy())
                 q2_history.append(q2.copy())
 
+                # If inner loop timed out, continue to next outer loop iteration
+                if time.time() - q_loop_start_time > 1 * 120:
+                    continue
+
+            # Store history for each sample
             q1_history_per_sample[m] = q1_history.copy()
             q2_history_per_sample[m] = q2_history.copy()
+            batch_end_time = time.time()  # End time for this batch
+            batch_times[m] = batch_end_time - batch_start_time
 
+            # Check for equilibrium conditions
             self.eqC[0, m] = np.allclose(pi1, self.state_transition.pi_eqC) and np.allclose(pi2, self.state_transition.pi_eqC)
             self.eqD[0, m] = np.allclose(pi1, self.state_transition.pi_eqD) and np.allclose(pi2, self.state_transition.pi_eqD)
-            
+
+            # Print summary if verbose is enabled
             if verbose:
                 print(self.summary(start_time))
 
-        return q1_history_per_sample, q2_history_per_sample
+            # If the outer loop timed out, continue to the next sample
+            if time.time() - loop_start_time > 1 * 120:
+                continue
+
+        return q1_history_per_sample, q2_history_per_sample, batch_times
 
 
     def update_policies(self, q1, q2):

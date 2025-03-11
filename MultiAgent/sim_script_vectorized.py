@@ -21,12 +21,12 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
             random_uniform=random_uniform, tolerance=1e-5, 
             M=int(M_value), verbose=False
         )
-        q1_history_per_sample, q2_history_per_sample = algo.run()
+        q1_history_per_sample, q2_history_per_sample, batch_times = algo.run()
 
         # Process results
         dfs_1 = convert_dict_to_mean_df(q1_history_per_sample, mean=False)
         dfs_2 = convert_dict_to_mean_df(q2_history_per_sample, mean=False)
-
+        batch_times_df = pd.DataFrame(list(batch_times.items()), columns=["Batch", "Time"])
         # Combine last rows from all DataFrames
         dfs_1_last = pd.concat([df.iloc[[-1]] for df in dfs_1])
         dfs_2_last = pd.concat([df.iloc[[-1]] for df in dfs_2])
@@ -64,11 +64,14 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
         P_GT = ((strategy_df['Strategy_1'] == 2) & (strategy_df['Strategy_2'] == 2)).mean()
         nonconv = (strategy_df['Strategy_1'] != strategy_df['Strategy_2']).sum()
 
+        batch_times_df_max = batch_times_df['Time'].max()
+        batch_times_df_min = batch_times_df['Time'].min()
+        batch_times_df_mean = batch_times_df['Time'].mean()
         # Save result
         results_chunk.append({'M': int(M_value),
             'alpha': alpha, 'lambda': lambda_val, 'e': e, 'delta': delta,
             'random_uniform': random_uniform, 'P_AD': P_AD, 'P_GT': P_GT,
-            'nonconv': nonconv
+            'nonconv': nonconv, 'time_max': batch_times_df_max, 'time_min': batch_times_df_min, 'time_mean': batch_times_df_mean
         })
 
     return results_chunk
@@ -131,7 +134,6 @@ def save_results(results_chunk, file_path):
     # Clear memory
     del results_chunk
     collect()
-
 def chunk_generator(iterator, chunk_size):
     """Yield successive chunks of data from an iterator."""
     chunk = []
@@ -155,7 +157,7 @@ def run_experiment(parameter_combinations, file_path="results_vect3.csv"):
 
     total_chunks = len(parameter_combinations_chunks)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count() // 3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
         futures = {
             executor.submit(run_experiment_chunk_vect, chunk): idx
             for idx, chunk in enumerate(parameter_combinations_chunks)
@@ -180,7 +182,7 @@ def process_chunk(chunk):
     # Ensure we are generating the correct combinations from the chunk
     return list(itertools.product(*chunk))  # Generates the combinations for this chunk
 
-def generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M):
+def generate_combinations_parallel(M, alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values):
     """Generate parameter combinations using multiprocessing."""
     # Split parameters into chunks for parallel processing
     chunks = [
@@ -194,9 +196,9 @@ def generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, 
     # Flatten the list of results if necessary
     return [item for sublist in result for item in sublist]
 
-def run_experiment_a_old(parameter_combinations, file_path="results_vect1.csv"):
+def run_experiment_a_old(parameter_combinations, file_path="results_vect_fixed.csv"):
     """Run the experiment for all parameter combinations using multiprocessing."""
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count() // 3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
         futures = [
             executor.submit(run_experiment_chunk_vect, [comb])  # Submit tasks for each combination
             for comb in parameter_combinations
@@ -217,7 +219,7 @@ def run_experiment_with_timeout(comb, time_limit):
     # Start the timer for the experiment
     start_time = time.time()
 
-    while retries < 2:  # Retry only once (for a total of 2 attempts)
+    while retries < 1:  # Retry only once (for a total of 2 attempts)
         try:
             # Check the elapsed time before each run
             elapsed_time = time.time() - start_time
@@ -242,10 +244,10 @@ def run_experiment_with_timeout(comb, time_limit):
     print(f"Skipping combination {comb} after {retries} retries.")
     return None  # Return None if both attempts failed
 
-def run_experiment_a(parameter_combinations, file_path="results_vect_lambda.csv", time_limit=300):
+def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time.csv", time_limit=300):
     """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task."""
     
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count() // 3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
         futures = [
             executor.submit(run_experiment_with_timeout, comb, time_limit)  # Submit tasks for each combination
             for comb in parameter_combinations
@@ -273,11 +275,11 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_lambda.csv"
 
 # Test the parallel combination generation
 if __name__ == "__main__":
-    alpha_values = np.linspace(0.01, 0.5, 3)
-    lambda_values = np.linspace(0.01, 0.99, 25)
-    delta_values = np.linspace(0.01, 0.75, 3)
-    epsilon_values = np.linspace(0.01, 0.5, 2)
-    M = np.linspace(100, 10000, 5)
+    alpha_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959,1]
+    lambda_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959]
+    M_values = [20, 100, 500, 1000, 5000]
+    epsilon_values = [0.05, 0.35, 0.6]
+    delta_values = [0.35, 0.5, 0.75, 0.95] 
 
 
     # Function to round each linspace value to the nearest multiple of 3
@@ -289,14 +291,14 @@ if __name__ == "__main__":
     lambda_values_rounded = round_to_nearest_multiple(lambda_values, 3)
     delta_values_rounded = round_to_nearest_multiple(delta_values, 3)
     epsilon_values_rounded = round_to_nearest_multiple(epsilon_values, 3)
-    M_rounded = np.round(M)
+    M_rounded = np.round(M_values)
 
     random_uniform_values = [False]
 
     # Generate parameter combinations in parallel
-    parameter_combinations = generate_combinations_parallel(alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values, M_rounded)
+    parameter_combinations = generate_combinations_parallel(M_rounded, alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
     
     # Run the experiment with the generated combinations
-    print(f"Generated {len(parameter_combinations)} combinations.")
-    run_experiment_a(parameter_combinations)
+    print(f"Generated {len(parameter_combinations[29126:])} combinations.")
+    run_experiment_a(parameter_combinations[29126:])
 

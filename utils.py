@@ -48,7 +48,7 @@ def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
         if not subset.empty:
             plt.plot(
                 subset[x_var], 
-                subset['P_AD'], 
+                subset['P_GT'], 
                 marker='o', 
                 label=f"{varying_var}={value:.3f}", 
                 color=cmap(norm(value)),
@@ -56,9 +56,9 @@ def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     
     # Title and labels
     title = "Fixed Parameters: " + ", ".join(f"{key}={value}" for key, value in fixed_vars.items())
-    plt.title(f"Analysis of {x_var} vs P_AD with Varying {varying_var}\n{title}")
+    plt.title(f"Analysis of {x_var} vs P_GT with Varying {varying_var}\n{title}")
     plt.xlabel(x_var)
-    plt.ylabel('P_AD')
+    plt.ylabel('P_GT')
     plt.legend(title=varying_var)
     plt.grid()
     plt.show()

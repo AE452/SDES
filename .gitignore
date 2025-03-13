@@ -4,6 +4,7 @@ mathematica/
 .venv/
 
 *.csv
+*.pyc
 *.pdf
 *.DS_Store
 .DS_Store

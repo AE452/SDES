@@ -107,7 +107,7 @@ def plot_analysis_average_and_vary(df, y_var, averaging_vars, x_var, varying_var
     
     # Title and labels
     title = "Averaged Over: " + ", ".join(averaging_vars)
-    plt.title(f"Analysis of {x_var} vs P_AD with Varying {varying_var}\n{title}")
+    plt.title(f"Analysis of {x_var} vs {y_var}with Varying {varying_var}\n{title}")
     plt.xlabel(x_var)
     plt.ylabel(y_var)
     plt.legend(title=varying_var)

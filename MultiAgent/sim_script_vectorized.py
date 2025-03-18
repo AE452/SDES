@@ -134,6 +134,7 @@ def save_results(results_chunk, file_path):
     # Clear memory
     del results_chunk
     collect()
+
 def chunk_generator(iterator, chunk_size):
     """Yield successive chunks of data from an iterator."""
     chunk = []

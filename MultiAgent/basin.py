@@ -2,20 +2,83 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-# Define Q-value functions (you will need to implement them from the Mathematica expressions)
-def Qvalues_AD_vs_00(t, r, p, s, epsilon, d):
-    # Replace with the full implementation for the Q-value functions from Mathematica
-    q1 = -((2 * p - epsilon * p + epsilon * t) / (2 * (-1 + d)))
-    q2 = -((2 * d * p - d * epsilon * p + epsilon * r - d * epsilon * r + 2 * s - 2 * d * s - epsilon * s + d * epsilon * s + d * epsilon * t) / (2 * (-1 + d)))
-    return np.array([[q1, q2], [q1, q2]])
+def QvaluesADvs00(t, r, p, s, epsilon, d):
+    return np.array([
+        [-(2*p - epsilon*p + epsilon*t) / (2 * (1 - d)), -1 / (2 * (1 - d)) * (2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t)],
+        [-(2*p - epsilon*p + epsilon*t) / (2 * (1 - d)), -1 / (2 * (1 - d)) * (2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t)]
+    ])
 
-def Qvalues_AD_vs_01(t, r, p, s, epsilon, d):
-    # Implement the Q-values for this case based on Mathematica code
-    pass
+def QvaluesADvs01(t, r, p, s, epsilon, d):
+    return np.array([
+        [-1 / (2 * (1 - d)) * (2*p - 2*d*p - epsilon*p + 2*d*epsilon*p + 2*d*t + epsilon*t - 2*d*epsilon*t),
+         -(1 / (2 * (1 - d))) * (2*d*epsilon*p - d**2*epsilon*p - d*epsilon**2*p + d**2*epsilon**2*p + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + 2*d*t - 2*d*epsilon*t + d**2*epsilon*t + d*epsilon**2*t - d**2*epsilon**2*t)],
+        [-(epsilon*p + 2*t - epsilon*t) / (2 * (1 - d)),
+         -(1 / (2 * (1 - d))) * (2*d*p - 2*d**2*p - 2*d*epsilon*p + 3*d**2*epsilon*p + d*epsilon**2*p - d**2*epsilon**2*p + 2*r - 2*d*r - epsilon*r + d*epsilon*r + epsilon*s - d*epsilon*s + 2*d**2*t + 2*d*epsilon*t - 3*d**2*epsilon*t - d*epsilon**2*t + d**2*epsilon**2*t)]
+    ])
 
-def Qvalues_AD_vs_11(t, r, p, s, epsilon, d):
-    # Implement the Q-values for this case based on Mathematica code
-    pass
+def QvaluesADvs11(t, r, p, s, epsilon, d):
+    return np.array([
+        [-(epsilon*p + 2*t - epsilon*t) / (2 * (1 - d)), -1 / (2 * (1 - d)) * (d*epsilon*p + 2*r - 2*d*r - epsilon*r + d*epsilon*r + epsilon*s - d*epsilon*s + 2*d*t - d*epsilon*t)],
+        [-(epsilon*p + 2*t - epsilon*t) / (2 * (1 - d)), -1 / (2 * (1 - d)) * (d*epsilon*p + 2*r - 2*d*r - epsilon*r + d*epsilon*r + epsilon*s - d*epsilon*s + 2*d*t - d*epsilon*t)]
+    ])
+
+def QvaluesGTvsGT(t, r, p, s, epsilon, d):
+    return np.array([
+        [-1 / (2 * (1 - d)) * (2*d*p + epsilon*p - 2*d*epsilon*p + 2*t - 2*d*t - epsilon*t + 2*d*epsilon*t),
+         - (2*d*epsilon*p - d*epsilon**2*p + 4*r - 4*d*r - 2*epsilon*r + 2*d*epsilon*r + 2*epsilon*s - 2*d*epsilon*s + d*epsilon**2*t) / (2 * (1 - d) * (2 - 2*d + d*epsilon))],
+        [-(2*p - epsilon*p + epsilon*t) / (2 * (1 - d)),
+         - (1 / (2 * (1 - d) * (2 - 2*d + d*epsilon))) * (4*d*p - 4*d**2*p - 4*d*epsilon*p + 6*d**2*epsilon*p + d*epsilon**2*p - 2*d**2*epsilon**2*p + 2*epsilon*r - 2*d*epsilon*r + 4*s - 8*d*s + 4*d**2*s - 2*epsilon*s + 6*d*epsilon*s - 4*d**2*epsilon*s + 2*d*epsilon*t - 2*d**2*epsilon*t - d*epsilon**2*t + 2*d**2*epsilon**2*t)]
+    ])
+
+def plot_q_values():
+    t, s, r, p, epsilon = 1, 0, 0.9, 0.2, 0.2
+    d_values = np.linspace(0, 1, 100)
+    
+    # Q-values for Playing C in State 0
+    q00 = [QvaluesADvs00(t, r, p, s, epsilon, d)[0, 0] for d in d_values]
+    q01 = [QvaluesADvs01(t, r, p, s, epsilon, d)[0, 0] for d in d_values]
+    q11 = [QvaluesADvs11(t, r, p, s, epsilon, d)[0, 0] for d in d_values]
+    
+    plt.figure(figsize=(8, 5))
+    plt.plot(d_values, q00, label='QvaluesADvs00')
+    plt.plot(d_values, q01, label='QvaluesADvs01')
+    plt.plot(d_values, q11, label='QvaluesADvs11')
+    plt.xlabel('d')
+    plt.ylabel('Q-value')
+    plt.title('Q-values for Playing C in State 0')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    # Q-values for Playing D in State 1
+    q00_d1 = [QvaluesADvs00(t, r, p, s, epsilon, d)[1, 0] for d in d_values]
+    q01_d1 = [QvaluesADvs01(t, r, p, s, epsilon, d)[1, 0] for d in d_values]
+    
+    plt.figure(figsize=(8, 5))
+    plt.plot(d_values, q00_d1, label='QvaluesADvs00 (D, State 1)')
+    plt.plot(d_values, q01_d1, label='QvaluesADvs01 (D, State 1)')
+    plt.xlabel('d')
+    plt.ylabel('Q-value')
+    plt.title('Q-values for Playing D in State 1')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    # Q-values for Playing C in State 1
+    q00_c1 = [QvaluesADvs00(t, r, p, s, epsilon, d)[1, 1] for d in d_values]
+    q01_c1 = [QvaluesADvs01(t, r, p, s, epsilon, d)[1, 1] for d in d_values]
+    q11_c1 = [QvaluesADvs11(t, r, p, s, epsilon, d)[1, 1] for d in d_values]
+    
+    plt.figure(figsize=(8, 5))
+    plt.plot(d_values, q00_c1, label='QvaluesADvs00 (C, State 1)')
+    plt.plot(d_values, q01_c1, label='QvaluesADvs01 (C, State 1)')
+    plt.plot(d_values, q11_c1, label='QvaluesADvs11 (C, State 1)')
+    plt.xlabel('d')
+    plt.ylabel('Q-value')
+    plt.title('Q-values for Playing C in State 1')
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 # Example parameters (you can modify these based on your setup)
 t = 1
@@ -24,40 +87,4 @@ p = 0.2
 s = 0
 epsilon = 0.2
 
-def plot_Qvalue_difference():
-    d_values = np.linspace(0, 1, 100)  # Define the range for d (inertia parameter)
-    
-    # Compute the Q-value differences
-    Q_diff_1 = Qvalues_AD_vs_00(t, r, p, s, epsilon, d_values)[0][0] - Qvalues_AD_vs_00(t, r, p, s, epsilon, d_values)[0][1]
-    Q_diff_2 = Qvalues_AD_vs_00(t, r, p, s, epsilon, d_values)[1][0] - Qvalues_AD_vs_00(t, r, p, s, epsilon, d_values)[1][1]
-    
-    # Create the plot
-    plt.figure(figsize=(8, 6))
-    plt.plot(d_values, Q_diff_1, label="Q-value diff (state 0, D vs C)")
-    plt.plot(d_values, Q_diff_2, label="Q-value diff (state 1, D vs C)", linestyle='--')
-    plt.xlabel("Inertia (d)")
-    plt.ylabel("Q-value Difference")
-    plt.title("Q-value Difference for AD vs 00")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def vector_field_plot():
-    # Define the grid for the vector field
-    x = np.linspace(-1/(1 - 0.7), 1/(1 - 0.7), 20)  # For example, choose the range for x and y
-    y = np.linspace(-1/(1 - 0.7), 1/(1 - 0.7), 20)
-    X, Y = np.meshgrid(x, y)
-    
-    # Compute the vector components (use the Q-value difference expressions for vectors)
-    U = 0.3 * (Qvalues_GT_vs_GT(t, r, p, s, epsilon, 0.7)[0][0] - Qvalues_GT_vs_GT(t, r, p, s, epsilon, 0.7)[0][1] - X)
-    V = 0.3 * (Qvalues_AD_vs_00(t, r, p, s, epsilon, 0.7)[1][0] - Qvalues_AD_vs_00(t, r, p, s, epsilon, 0.7)[1][1] - Y)
-    
-    # Create the plot
-    plt.figure(figsize=(8, 6))
-    plt.quiver(X, Y, U, V, scale=10, color=cm.viridis(np.linalg.norm([U, V], axis=0)))
-    plt.xlabel("State 0 Q-value difference (x)")
-    plt.ylabel("State 1 Q-value difference (y)")
-    plt.title("Vector Field for Q-value Difference")
-    plt.grid(True)
-    plt.show()
-
+plot_q_values()

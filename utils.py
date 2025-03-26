@@ -272,3 +272,70 @@ def create_line(value, length=10):
         list: A list containing the repeated values.
     """
     return [value for _ in range(length)]
+
+
+def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, show_legend, y_limits=None):
+    """
+    Plots multiple lines of P_AD against a specified variable on the x-axis, 
+    with each line representing a unique value of the varying variable.
+    
+    Parameters:
+        df (pd.DataFrame): The dataframe containing the data.
+        fixed_vars (dict): Dictionary of variables to fix with their values, e.g., {'delta': 0.786, 'lambda': 0.132}.
+        x_var (str): The variable to plot on the x-axis.
+        varying_var (str): The variable to vary, creating multiple lines.
+        ax (matplotlib.axes.Axes): The axis to plot on.
+        show_legend (bool): Flag to display the legend on the first subplot.
+        y_limits (tuple, optional): Tuple of (y_min, y_max) for the y-axis limits.
+    """
+    # Validate inputs
+    if 'P_AD' not in df.columns:
+        raise ValueError("The dataframe must contain the column 'P_AD' for plotting.")
+    if x_var not in df.columns:
+        raise ValueError(f"The specified x-axis variable '{x_var}' is not in the dataframe.")
+    if varying_var not in df.columns:
+        raise ValueError(f"The specified varying variable '{varying_var}' is not in the dataframe.")
+    for var in fixed_vars:
+        if var not in df.columns:
+            raise ValueError(f"The fixed variable '{var}' is not in the dataframe.")
+    
+    # Filter the dataframe based on fixed variables
+    filtered_df = df.copy()
+    for var, value in fixed_vars.items():
+        filtered_df = filtered_df[filtered_df[var] == value]
+    
+    # Check if there is any data left after filtering
+    if filtered_df.empty:
+        print(f"No data available for the specified fixed variables: {fixed_vars}")
+        return
+    
+    # Get unique values of the varying variable
+    unique_values = sorted(filtered_df[varying_var].unique())    
+    # Normalize unique values for colormap
+    norm = plt.Normalize(min(unique_values), max(unique_values))
+    cmap = cm.get_cmap('viridis')
+    
+    # Plot each unique value as a separate line
+    for value in unique_values:
+        subset = filtered_df[filtered_df[varying_var] == value]
+        if not subset.empty:
+            ax.plot(
+                subset[x_var], 
+                subset['P_GT'], 
+                marker='o', 
+                label=f"{varying_var}={value:.3f}", 
+                color=cmap(norm(value)),
+            )
+    
+    # Title and labels
+    title = "Fixed Parameters: " + ", ".join(f"{key}={value}" for key, value in fixed_vars.items())
+    ax.set_title(f"Analysis of {x_var} vs P_GT with Varying {varying_var}\n{title}")
+    ax.set_xlabel(x_var)
+    ax.set_ylabel('P_GT')
+    if show_legend:
+        ax.legend(title=varying_var)
+    ax.grid()
+
+    # Set y-limits if provided
+    if y_limits is not None:
+        ax.set_ylim(y_limits)

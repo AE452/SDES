@@ -80,11 +80,13 @@ def plot_q_values():
     plt.grid()
     plt.show()
 
-# Example parameters (you can modify these based on your setup)
-t = 1
-r = 0.9
-p = 0.2
-s = 0
-epsilon = 0.2
+if __name__ =='__main__':
+    
+    # Example parameters (you can modify these based on your setup)
+    t = 1
+    r = 0.8
+    p = 0.2
+    s = 0
+    epsilon = 0.2
 
-plot_q_values()
+    plot_q_values()

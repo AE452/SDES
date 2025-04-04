@@ -62,7 +62,8 @@ class Algorithm:
         start_time = time.time()
         q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
         timeout_out_flag_dict, timeout_vi_flag_dict = {}, {} 
-        timeout = 60 
+        timeout_outer = 60 
+        timeout_inner = 30
         
         for m in range(self.M):
             timeout_out_flag = False  # Outer loop timeout flag
@@ -77,7 +78,7 @@ class Algorithm:
 
             # Outer loop with timeout
             while error:
-                if time.time() - loop_start_time > 1 * timeout:  
+                if time.time() - loop_start_time > 1 * timeout_outer:  
                     # Save results even if timeout occurs
                     q1_history_per_sample[m] = q1_history.copy()
                     q2_history_per_sample[m] = q2_history.copy()
@@ -93,7 +94,7 @@ class Algorithm:
 
                 # Inner loop with timeout
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * timeout_vi:  
+                    if time.time() - q_loop_start_time > 1 * timeout_inner:  
                         #print("Stopping inner loop due to timeout.")
                         q1_history.append(q1.copy())
                         q2_history.append(q2.copy())
@@ -114,7 +115,7 @@ class Algorithm:
                 q2_history.append(q2.copy())
 
                 # If inner loop timed out, continue to next outer loop iteration
-                if time.time() - q_loop_start_time > 1*60:
+                if time.time() - q_loop_start_time > 1*timeout_inner:
                     continue
 
             # Store history for each sample
@@ -134,7 +135,7 @@ class Algorithm:
                 print(self.summary(start_time))
 
             # If the outer loop timed out, continue to the next sample
-            if time.time() - loop_start_time > 1 * 60:
+            if time.time() - loop_start_time > 1 * timeout_outer:
                 continue
 
         return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
@@ -232,7 +233,8 @@ class Algorithm_1:
         start_time = time.time()
         q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
         timeout_out_flag_dict, timeout_vi_flag_dict = {}, {} 
-        timeout = 60 
+        timeout_outer = 60 
+        timeout_inner = 30
         
         for m in range(self.M):
             timeout_out_flag = False  # Outer loop timeout flag
@@ -247,7 +249,7 @@ class Algorithm_1:
 
             # Outer loop with timeout
             while error:
-                if time.time() - loop_start_time > 1 * timeout:  
+                if time.time() - loop_start_time > 1 * timeout_outer:  
                     # Save results even if timeout occurs
                     q1_history_per_sample[m] = q1_history.copy()
                     q2_history_per_sample[m] = q2_history.copy()
@@ -263,7 +265,7 @@ class Algorithm_1:
 
                 # Inner loop with timeout
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * timeout_vi:  
+                    if time.time() - q_loop_start_time > 1 * timeout_inner:  
                         #print("Stopping inner loop due to timeout.")
                         q1_history.append(q1.copy())
                         q2_history.append(q2.copy())
@@ -284,7 +286,7 @@ class Algorithm_1:
                 q2_history.append(q2.copy())
 
                 # If inner loop timed out, continue to next outer loop iteration
-                if time.time() - q_loop_start_time > 1*60:
+                if time.time() - q_loop_start_time > 1*timeout_inner:
                     continue
 
             # Store history for each sample
@@ -304,7 +306,7 @@ class Algorithm_1:
                 print(self.summary(start_time))
 
             # If the outer loop timed out, continue to the next sample
-            if time.time() - loop_start_time > 1 * 60:
+            if time.time() - loop_start_time > 1 * timeout_outer:
                 continue
 
         return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict

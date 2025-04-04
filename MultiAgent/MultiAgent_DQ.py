@@ -61,8 +61,12 @@ class Algorithm:
         """Runs the main algorithm."""
         start_time = time.time()
         q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
+        timeout_out_flag_dict, timeout_vi_flag_dict = {}, {} 
         timeout = 60 
+        
         for m in range(self.M):
+            timeout_out_flag = False  # Outer loop timeout flag
+            timeout_vi_flag = False  # Inner loop timeout flag
             q1, q2 = self.initialize_q_values()
             q1_val = q1.copy()
             q2_val = q2.copy()
@@ -77,6 +81,8 @@ class Algorithm:
                     # Save results even if timeout occurs
                     q1_history_per_sample[m] = q1_history.copy()
                     q2_history_per_sample[m] = q2_history.copy()
+                    timeout_out_flag = True
+                    timeout_out_flag_dict[m] = timeout_out_flag
 
                     #print("Stopping outer loop due to timeout.")
                     break  # Exit outer loop if timeout is exceeded
@@ -87,10 +93,12 @@ class Algorithm:
 
                 # Inner loop with timeout
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * timeout:  
+                    if time.time() - q_loop_start_time > 1 * timeout_vi:  
                         #print("Stopping inner loop due to timeout.")
                         q1_history.append(q1.copy())
                         q2_history.append(q2.copy())
+                        timeout_vi_flag = True
+                        timeout_vi_flag_dict[m] = timeout_vi_flag
                         break  # Exit inner loop if timeout is exceeded
 
                     # Update Q-values
@@ -114,6 +122,8 @@ class Algorithm:
             q2_history_per_sample[m] = q2_history.copy()
             batch_end_time = time.time()  # End time for this batch
             batch_times[m] = batch_end_time - batch_start_time
+            timeout_out_flag_dict[m] = timeout_out_flag
+            timeout_vi_flag_dict[m] = timeout_vi_flag
 
             # Check for equilibrium conditions
             self.eqC[0, m] = np.allclose(pi1, self.state_transition.pi_eqC) and np.allclose(pi2, self.state_transition.pi_eqC)
@@ -127,7 +137,7 @@ class Algorithm:
             if time.time() - loop_start_time > 1 * 60:
                 continue
 
-        return q1_history_per_sample, q2_history_per_sample, batch_times
+        return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
 
 
     def update_policies(self, q1, q2):
@@ -221,8 +231,12 @@ class Algorithm_1:
         """Runs the main algorithm."""
         start_time = time.time()
         q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
+        timeout_out_flag_dict, timeout_vi_flag_dict = {}, {} 
         timeout = 60 
+        
         for m in range(self.M):
+            timeout_out_flag = False  # Outer loop timeout flag
+            timeout_vi_flag = False  # Inner loop timeout flag
             q1, q2 = self.initialize_q_values()
             q1_val = q1.copy()
             q2_val = q2.copy()
@@ -237,6 +251,8 @@ class Algorithm_1:
                     # Save results even if timeout occurs
                     q1_history_per_sample[m] = q1_history.copy()
                     q2_history_per_sample[m] = q2_history.copy()
+                    timeout_out_flag = True
+                    timeout_out_flag_dict[m] = timeout_out_flag
 
                     #print("Stopping outer loop due to timeout.")
                     break  # Exit outer loop if timeout is exceeded
@@ -247,10 +263,12 @@ class Algorithm_1:
 
                 # Inner loop with timeout
                 while q_error > self.tolerance:
-                    if time.time() - q_loop_start_time > 1 * timeout:  
+                    if time.time() - q_loop_start_time > 1 * timeout_vi:  
                         #print("Stopping inner loop due to timeout.")
                         q1_history.append(q1.copy())
                         q2_history.append(q2.copy())
+                        timeout_vi_flag = True
+                        timeout_vi_flag_dict[m] = timeout_vi_flag
                         break  # Exit inner loop if timeout is exceeded
 
                     # Update Q-values
@@ -266,7 +284,7 @@ class Algorithm_1:
                 q2_history.append(q2.copy())
 
                 # If inner loop timed out, continue to next outer loop iteration
-                if time.time() - q_loop_start_time > 1 * 60:
+                if time.time() - q_loop_start_time > 1*60:
                     continue
 
             # Store history for each sample
@@ -274,6 +292,8 @@ class Algorithm_1:
             q2_history_per_sample[m] = q2_history.copy()
             batch_end_time = time.time()  # End time for this batch
             batch_times[m] = batch_end_time - batch_start_time
+            timeout_out_flag_dict[m] = timeout_out_flag
+            timeout_vi_flag_dict[m] = timeout_vi_flag
 
             # Check for equilibrium conditions
             self.eqC[0, m] = np.allclose(pi1, self.state_transition.pi_eqC) and np.allclose(pi2, self.state_transition.pi_eqC)
@@ -287,7 +307,8 @@ class Algorithm_1:
             if time.time() - loop_start_time > 1 * 60:
                 continue
 
-        return q1_history_per_sample, q2_history_per_sample, batch_times
+        return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
+
 
 
     def update_policies(self, q1, q2):
@@ -314,11 +335,11 @@ class Algorithm_1:
 
         q1_max = ((1 - self.e) * np.max(q1_val, axis=0) + self.e * np.mean(q1_val, axis=0))
         q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-        q1_new = (1-self.alpha)*r1_pi2 + self.delta * q1_new
+        q1_new = (1-self.delta)*r1_pi2 + self.delta * q1_new
 
         q2_max = ((1 - self.e) * np.max(q2_val, axis=0) + self.e * np.mean(q2_val, axis=0))
         q2_new = np.vstack((np.dot(P2_C_pi1, q2_max), np.dot(P2_D_pi1, q2_max)))
-        q2_new = (1-self.alpha)*r2_pi1 + self.delta * q2_new
+        q2_new = (1-self.delta)*r2_pi1 + self.delta * q2_new
 
         q_error = np.max(np.abs(q1_new - q1_val) + np.abs(q2_new - q2_val))
         return q1_new, q2_new, q_error

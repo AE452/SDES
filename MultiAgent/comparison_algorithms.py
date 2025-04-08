@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-
+from MultiAgent_DQ import *
 def detect_strategy(df_last):
     return np.where(
         (df_last['Q1'] < df_last['Q3']) & (df_last['Q2'] < df_last['Q4']), 1,
@@ -105,6 +105,7 @@ def run_all(high_non_conv_df, n_jobs=-1):
     return pd.DataFrame(flat_results)
 
 if __name__ == "__main__":
-    high_non_conv_df = ...  # Load or pass your DataFrame here
+    df_f = pd.read_csv("../results/results_from_vectorized_script_raw.csv")
+    high_non_conv_df = df_f[(df_f['nonconv']>=25)&(df_f['lambda']<=0.5)].reset_index().drop(columns='index')
     results_df = run_all(high_non_conv_df)
-    results_df.to_csv("algorithm_results_comparison.csv", index=False)
+    results_df.to_csv("algorithm_results_comparison_test.csv", index=False)

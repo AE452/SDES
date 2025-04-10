@@ -1,9 +1,10 @@
-# Filename: run_algorithms.py
-
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from MultiAgent_DQ import *
+import os
+
+
 def detect_strategy(df_last):
     return np.where(
         (df_last['Q1'] < df_last['Q3']) & (df_last['Q2'] < df_last['Q4']), 1,
@@ -104,8 +105,24 @@ def run_all(high_non_conv_df, n_jobs=-1):
     flat_results = [result for pair in all_results for result in pair]
     return pd.DataFrame(flat_results)
 
+def run_all_incremental(high_non_conv_df, output_path="algorithm_results_comparison_non_conv.csv", n_jobs=1, overwrite=True):
+    if overwrite and os.path.exists(output_path):
+        os.remove(output_path)
+
+    def wrapper(row):
+        results = process_single_run(row)
+        results_df = pd.DataFrame(results)
+        results_df.to_csv(output_path, mode='a', index=False, header=not os.path.exists(output_path))
+
+    Parallel(n_jobs=n_jobs)(
+        delayed(wrapper)(row) for _, row in high_non_conv_df.iterrows()
+    )
+
+    return pd.read_csv(output_path)
+
+
 if __name__ == "__main__":
-    df_f = pd.read_csv("../results/results_from_vectorized_script_raw.csv")
-    high_non_conv_df = df_f[(df_f['nonconv']>=25)&(df_f['lambda']<=0.5)].reset_index().drop(columns='index')
-    results_df = run_all(high_non_conv_df)
-    results_df.to_csv("algorithm_results_comparison_test.csv", index=False)
+    high_non_conv_df = pd.read_csv('./high_non_conv_df.csv')
+    #results_df = run_all(high_non_conv_df, n_jobs=4)
+    results_df = run_all_incremental(high_non_conv_df, output_path="algorithm_results_comparison_non_conv.csv", n_jobs=4)
+    results_df.to_csv("algorithm_results_comparison_non_conv.csv", index=False)

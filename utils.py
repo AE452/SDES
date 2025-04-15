@@ -339,3 +339,81 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, sho
     # Set y-limits if provided
     if y_limits is not None:
         ax.set_ylim(y_limits)
+
+
+def trajectory_dinamics_plot(x, y, zoom_range=None):
+    """
+    zoom_range = {'xlim': (x_min, x_max), 'ylim': (y_min, y_max)}
+    """
+    u = x[1:] - x[:-1]
+    v = y[1:] - y[:-1]
+
+    plt.figure(figsize=(10, 10))
+    plt.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1, color='grey')
+    plt.scatter(x, y, color='black', s=10)
+    plt.title("Trajectory Dynamics")
+    plt.grid(True)
+
+    # Apply zoom if specified
+    if zoom_range is not None:
+        if 'xlim' in zoom_range:
+            plt.xlim(zoom_range['xlim'])
+        if 'ylim' in zoom_range:
+            plt.ylim(zoom_range['ylim'])
+
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.show()
+
+def multi_centered_trajectory_plot(*trajectories, labels=None, colors=None):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Set default colors if not provided
+    default_colors = ['crimson', 'teal', 'orange', 'blue', 'green', 'magenta', 'brown', 'slategray']
+    if colors is None:
+        colors = default_colors
+    if labels is None:
+        labels = [f'Trajectory {i+1}' for i in range(len(trajectories))]
+
+    # Determine max range for auto-scaling
+    all_x = np.concatenate([traj[0] for traj in trajectories])
+    all_y = np.concatenate([traj[1] for traj in trajectories])
+    max_val = max(np.max(np.abs(all_x)), np.max(np.abs(all_y)))
+    ax.set_xlim(-max_val, max_val)
+    ax.set_ylim(-max_val, max_val)
+
+    # Grid and axes setup
+    ax.set_xticks(np.arange(-max_val*1.1, max_val*1.1, 1))
+    ax.set_yticks(np.arange(-max_val*1.1, max_val*1.1, 1))
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='grey', alpha=0.1)
+    ax.axhline(0, color='black', linewidth=1)
+    ax.axvline(0, color='black', linewidth=1)
+
+    # Hide spines
+    for spine in ['top', 'right', 'left', 'bottom']:
+        ax.spines[spine].set_visible(False)
+
+    # Axis arrows
+    #ax.annotate('', xy=(1, 0), xytext=(0, 0),arrowprops=dict(facecolor='purple', width=1.5, headwidth=8))
+    #ax.annotate('', xy=(0, 1), xytext=(0, 0),arrowprops=dict(facecolor='purple', width=1.5, headwidth=8))
+
+    # Plot each trajectory
+    for i, (x, y) in enumerate(trajectories):
+        u = x[1:] - x[:-1]
+        v = y[1:] - y[:-1]
+        color = colors[i % len(colors)]
+        label = labels[i] if i < len(labels) else f'Trajectory {i+1}'
+        
+        ax.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1,
+                  color=color, width=0.003, headwidth=4, headlength=6, label=label)
+        ax.scatter(x, y, color=color, s=10)
+
+    ax.set_aspect('equal')
+    ax.set_xlabel('x', labelpad=10, fontsize=12)
+    ax.set_ylabel('y', labelpad=10, fontsize=12)
+    ax.set_title("Trajectories on Cartesian Grid", fontsize=14)
+    ax.legend()
+    plt.show()

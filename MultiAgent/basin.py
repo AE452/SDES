@@ -85,7 +85,7 @@ class VectorFieldPlotter:
                  q_func_gt=None, q_func_ad=None,
                  alpha=0.1, bound=1.0,
                  x_state='StateC', y_state='StateC',
-                 show_trajectory=True, show_boundary=True):
+                 show_trajectory=True, show_basin=True):
 
         self.q1 = q1
         self.q2 = q2
@@ -97,7 +97,7 @@ class VectorFieldPlotter:
         self.x_state = x_state
         self.y_state = y_state
         self.show_trajectory = show_trajectory
-        self.show_boundary = show_boundary
+        self.show_basin = show_basin
         self.eps = 1e-8
 
         self.q_func_gt = q_func_gt

@@ -60,7 +60,7 @@ class VectorFieldPlotter:
         State to use for the y-axis trajectory ('StateC' or 'StateD'). Default is 'StateC'.
     show_trajectory : bool, optional
         If True, displays the trajectory from q1 and q2. Default is True.
-    show_boundary : bool, optional
+    show_basin : bool, optional
         If True, displays the BoA boundary line. Default is True.
 
     
@@ -75,7 +75,7 @@ class VectorFieldPlotter:
         x_state='StateC',
         y_state='StateD',
         show_trajectory=True,
-        show_boundary=True
+        show_basin=True
     )
     plotter.plot()
 
@@ -169,7 +169,7 @@ class VectorFieldPlotter:
         self.add_vector_field(ax, self.field1, (0, self.bound), (-self.bound, 0))                    # 4th quadrant
         self.add_vector_field(ax, self.field4, (-self.bound, 0), (0, self.bound))                    # 2nd quadrant
 
-        if self.show_boundary:
+        if self.show_basin:
             ax.plot([0, self.end_x], [0, self.end_y], color='red', linewidth=2, label='BoA Boundary')
 
         # Axes styling

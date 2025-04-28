@@ -30,6 +30,7 @@ def QvaluesGTvsGT(t, r, p, s, epsilon, d):
          - (1 / (2 * (-1+d) * (2 - 2*d + d*epsilon))) * (4*d*p - 4*d**2*p - 4*d*epsilon*p + 6*d**2*epsilon*p + d*epsilon**2*p - 2*d**2*epsilon**2*p + 2*epsilon*r - 2*d*epsilon*r + 4*s - 8*d*s + 4*d**2*s - 2*epsilon*s + 6*d*epsilon*s - 4*d**2*epsilon*s + 2*d*epsilon*t - 2*d**2*epsilon*t - d*epsilon**2*t + 2*d**2*epsilon**2*t)]
     ])
 
+
 class VectorFieldPlotter:
     """
     Plots a vector field and optionally overlays trajectory dynamics and BoA boundary.

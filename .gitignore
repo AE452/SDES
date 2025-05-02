@@ -2,6 +2,7 @@ papers/
 results/
 mathematica/
 .venv/
+__pycache__/
 
 *.csv
 *.pyc

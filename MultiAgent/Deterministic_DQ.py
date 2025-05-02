@@ -1,6 +1,5 @@
 import numpy as np
 import time
-#mordor cluster --> Mathias 
 
 def algorithm(e, lambda_val, alpha,delta, random_uniform,K,M, verbose = False):
     # Number of players, states, and actions

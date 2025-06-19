@@ -3,6 +3,14 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+
+import seaborn as sns
+import matplotlib as mpl
+
+# Use LaTeX for text rendering
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     """
     Plots multiple lines of P_AD against a specified variable on the x-axis, 
@@ -161,20 +169,24 @@ def plot_analysis(df, fixed_vars, x_var):
     plt.show()
 
 
-def heatmap_mean(df, yaxis, xaxis, value):
-
-    # Pivot the dataframe to create a matrix where 'alpha' and 'lambda' are the indices and columns
+def heatmap_mean(df, yaxis, xaxis, value='P_AD'):
     heatmap_data = df.pivot_table(index=yaxis, columns=xaxis, values=value, aggfunc='mean')
 
-    # Plot the heatmap
     plt.figure(figsize=(12, 8))
-    sns.heatmap(heatmap_data, cmap='YlGnBu', annot=False, fmt='.2f', cbar_kws={'label': f'Mean {str(value)}'})
+    sns.heatmap(
+        heatmap_data,
+        cmap='YlGnBu',
+        annot=False,
+        fmt='.2f',
+        cbar_kws={'label': r'Mean $P_{AD}$'}
+    )
 
-    # Set titles and labels
-    plt.title(f'Heatmap of {str(value)} by {str(yaxis)} and {str(xaxis)} (mean of all other params)')
+    # Title with fixed LaTeX-style P_{AD}
+    title_str = r'Heatmap of $P_{AD}$ by ' + f'{yaxis} and {xaxis}\n(mean of all other parameters)'
+    plt.title(title_str, fontsize=16)
     plt.xlabel(xaxis)
     plt.ylabel(yaxis)
-    plt.gca().invert_yaxis() 
+    plt.gca().invert_yaxis()
     plt.show()
 
 def convert_dict_to_mean_df(data_dict, mean = True):

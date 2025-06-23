@@ -67,13 +67,6 @@ def Qvalues00vsAD(t, r, p, s, epsilon, d):
         [-(2*p - epsilon*p + epsilon*t) / (2 * (-1 + d)),
          -(2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t) / (2 * (-1 + d))]
     ])
-def QvaluesGTvsAD(t, r, p, s, epsilon, d):
-    return np.array([
-        [-(2*d*p + epsilon*p - 2*d*epsilon*p + 2*t - 2*d*t - epsilon*t + 2*d*epsilon*t) / (2 * (-1 + d)),
-         -(2*d*epsilon*p - d*epsilon**2*p + 2*r - 2*d*r - epsilon*r + d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon**2*t) / (2 * (-1 + d))],
-        [-(2*p - epsilon*p + epsilon*t) / (2 * (-1 + d)),
-         -(2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t) / (2 * (-1 + d))]
-    ])
 
 
 class VectorFieldPlotter:
@@ -200,13 +193,13 @@ class VectorFieldPlotter:
         y_vals = np.linspace(*y_range, density)
         X, Y = np.meshgrid(x_vals, y_vals)
         U, V = field_func(X, Y)
-
+        magnitude = np.sqrt(U**2 + V**2)
         if self.method == "quiver":
             ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=4)
 
         elif method == "streamplot":
             norm = plt.Normalize(magnitude.min(), magnitude.max())
-            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm = plt.cm.ScalarMappable(cmap=self.cmap, norm=norm)
             sm.set_array([])
             fig.colorbar(sm, ax=ax, label='Flow Magnitude')
 

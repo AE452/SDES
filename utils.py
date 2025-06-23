@@ -353,7 +353,7 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, sho
         ax.set_ylim(y_limits)
 
 
-def trajectory_dinamics_plot(x, y, zoom_range=None):
+def trajectory_dynamics_plot(x, y, zoom_range=None):
     """
     zoom_range = {'xlim': (x_min, x_max), 'ylim': (y_min, y_max)}
     """

@@ -85,7 +85,7 @@ class VectorFieldPlotter:
                  t=1, r=3, p=0, s=5, epsilon=0.01, delta=0.9,
                  q_func_gt=None, q_func_ad=None,
                  alpha=0.1, bound=1.0,
-                 x_state='StateC', y_state='StateC',
+                 x_state='StateC', y_state='StateC',method = "quiver",cmap=cm.viridis,
                  show_trajectory=True, show_basin=True):
 
         self.q1 = q1
@@ -100,6 +100,8 @@ class VectorFieldPlotter:
         self.show_trajectory = show_trajectory
         self.show_basin = show_basin
         self.eps = 1e-8
+        self.method = method
+        self.cmap = cmap
 
         self.q_func_gt = q_func_gt
         self.q_func_ad = q_func_ad
@@ -148,21 +150,31 @@ class VectorFieldPlotter:
         """Flips a vector field across the origin while preserving direction."""
         return lambda x, y: tuple(-v for v in f(-x, -y))
 
-    def add_vector_field(self, ax, field_func, x_range, y_range, density=15):
-        """Adds a quiver vector field to a given matplotlib axis."""
+    def add_vector_field(self, ax, field_func, x_range, y_range, density=15, method="quiver"):
         x_vals = np.linspace(*x_range, density)
         y_vals = np.linspace(*y_range, density)
         X, Y = np.meshgrid(x_vals, y_vals)
         U, V = field_func(X, Y)
-        ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=4)
+
+        if self.method == "quiver":
+            ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=4)
+        elif self.method == "streamplot":
+            ax.streamplot(X, Y, U, V, color=np.hypot(U, V), cmap=self.cmap, density=0.8, linewidth=1)
 
     def plot(self):
         """Generates the vector field plot with optional trajectory and BoA boundary."""
         fig, ax = plt.subplots(figsize=(8, 8))
-
+        """
         if self.show_trajectory:
             ax.quiver(self.x[:-1], self.y[:-1], self.u, self.v, angles='xy', scale_units='xy', scale=1, color='blue')
             ax.scatter(self.x, self.y, color='black', s=10)
+        """
+
+        if self.show_trajectory:
+            ax.plot(self.x, self.y, color='black', linestyle='--', linewidth=1.5, alpha=0.7, label='Trajectory')
+            ax.scatter(self.x[0], self.y[0], color='green', marker='o', s=40, label='Start')
+            ax.scatter(self.x[-1], self.y[-1], color='red', marker='X', s=50, label='End')
+
 
         # Vector fields by quadrant
         self.add_vector_field(ax, self.flip_field(self.field3), (-self.bound, 0), (-self.bound, 0))  # 3rd quadrant
@@ -174,6 +186,10 @@ class VectorFieldPlotter:
             ax.plot([0, self.end_x], [0, self.end_y], color='red', linewidth=2, label='BoA Boundary')
 
         # Axes styling
+        """
+        old part
+        -----------
+        -----------
         ax.axhline(0, color='gray', linestyle='--', linewidth=0.5)
         ax.axvline(0, color='gray', linestyle='--', linewidth=0.5)
         ax.set_xlim(-self.bound, self.bound)
@@ -182,6 +198,23 @@ class VectorFieldPlotter:
         ax.set_ylabel('y')
         ax.set_title('Combined Vector Field with BoA Boundary')
         ax.grid(True)
+        """
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xlim(-self.bound, self.bound)
+        ax.set_ylim(-self.bound, self.bound)
+        ax.set_aspect('equal')
+        ax.set_xlabel(f"Agent 1: Pr({self.x_state[-1]})", fontsize=12)
+        ax.set_ylabel(f"Agent 2: Pr({self.y_state[-1]})", fontsize=12)
+        ax.set_title('Strategy Vector Field', fontsize=14)
+        # Center reference lines
+        ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
+        ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
+
+        ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.6)
+
+
+
         ax.legend()
         plt.tight_layout()
         plt.show()

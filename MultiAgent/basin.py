@@ -158,8 +158,12 @@ class VectorFieldPlotter:
 
         if self.method == "quiver":
             ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=4)
-        elif self.method == "streamplot":
-            ax.streamplot(X, Y, U, V, color=np.hypot(U, V), cmap=self.cmap, density=0.8, linewidth=1)
+
+        elif method == "streamplot":
+            norm = plt.Normalize(magnitude.min(), magnitude.max())
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax, label='Flow Magnitude')
 
     def plot(self):
         """Generates the vector field plot with optional trajectory and BoA boundary."""
@@ -171,7 +175,8 @@ class VectorFieldPlotter:
         """
 
         if self.show_trajectory:
-            ax.plot(self.x, self.y, color='black', linestyle='--', linewidth=1.5, alpha=0.7, label='Trajectory')
+            #ax.plot(self.x, self.y, color='black', linestyle='--', linewidth=1.5, alpha=0.7, label='Trajectory')
+            ax.quiver(self.x[:-1], self.y[:-1], self.u, self.v, angles='xy', scale_units='xy', scale=1, color='grey', alpha=0.5, label='Direction')
             ax.scatter(self.x[0], self.y[0], color='green', marker='o', s=40, label='Start')
             ax.scatter(self.x[-1], self.y[-1], color='red', marker='X', s=50, label='End')
 

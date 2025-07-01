@@ -225,6 +225,8 @@ class VectorFieldPlotter:
         self.add_vector_field(ax, self.field1, (0, self.bound), (-self.bound, 0))                    # 4th quadrant
         self.add_vector_field(ax, self.field4, (-self.bound, 0), (0, self.bound))                    # 2nd quadrant
 
+
+        
         if self.show_basin:
             ax.plot([0, self.end_x], [0, self.end_y], color='red', linewidth=2, label='BoA Boundary')
 

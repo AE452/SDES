@@ -78,17 +78,17 @@ class Algorithm:
         elif self.init_mode == "fixed":
             # define strong/weak biases
             
-            strong_AD = np.array([[1.0, 0.0],
-                      [0.0, 1.0]])
+            strong_AD = np.array([[5.0, 0.0],
+                      [0.0, 5.0]])
 
-            strong_GT = np.array([[0.0, 0.0],
-                                [1.0, 1.0]])
+            strong_GT = np.array([[0.2, 0.3],
+                                [4.0, 2.0]])
 
-            weak_AD = np.array([[0.7, 0.3],
-                                [0.3, 0.7]])
+            weak_AD = np.array([[4.0, 1.3],
+                                [2.3, 4.7]])
 
-            weak_GT = np.array([[0.4, 0.4],
-                                [0.6, 0.6]])
+            weak_GT = np.array([[4.4, 4.2],
+                                [3.3, 3.6]])
 
 
 

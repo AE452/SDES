@@ -3,14 +3,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
 import seaborn as sns
 import matplotlib as mpl
-
-# Use LaTeX for text rendering
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     """
     Plots multiple lines of P_AD against a specified variable on the x-axis, 
@@ -170,6 +164,19 @@ def plot_analysis(df, fixed_vars, x_var):
 
 
 def heatmap_mean(df, yaxis, xaxis, value='P_AD'):
+    greek_labels = {
+        "alpha": r"$\alpha$",
+        "beta": r"$\beta$",
+        "delta": r"$\delta$",
+        "epsilon": r"$\varepsilon$",
+        "e": r"$\varepsilon$",
+        "lambda": r"$\lambda$",
+        "mu": r"$\mu$",
+        "M": r"$M$",
+        "P_GT": r"$P_{GT}$",
+        "P_AD": r"$P_{AD}$",
+    }
+
     heatmap_data = df.pivot_table(index=yaxis, columns=xaxis, values=value, aggfunc='mean')
 
     plt.figure(figsize=(12, 8))
@@ -178,16 +185,26 @@ def heatmap_mean(df, yaxis, xaxis, value='P_AD'):
         cmap='YlGnBu',
         annot=False,
         fmt='.2f',
-        cbar_kws={'label': r'Mean $P_{AD}$'}
+        cbar_kws={'label': rf"Mean {greek_labels.get(value, value)}"}
     )
 
-    # Title with fixed LaTeX-style P_{AD}
-    title_str = r'Heatmap of $P_{AD}$ by ' + f'{yaxis} and {xaxis}\n(mean of all other parameters)'
+    # Title using Greek symbols
+    title_str = rf"Heatmap of {greek_labels.get(value, value)} by " \
+                rf"{greek_labels.get(yaxis, yaxis)} and {greek_labels.get(xaxis, xaxis)}" \
+                "\n(mean of all other parameters)"
     plt.title(title_str, fontsize=16)
-    plt.xlabel(xaxis)
-    plt.ylabel(yaxis)
-    plt.gca().invert_yaxis()
+
+    plt.xlabel(greek_labels.get(xaxis, xaxis))
+    plt.ylabel(greek_labels.get(yaxis, yaxis))
+    ax = plt.gca()
+    yticks = ax.get_yticks()
+    xticks = ax.get_xticks()
+    ax.set_xticks(xticks[::2])  # Show every second x-t
+    ax.set_yticks(yticks[::2]) 
+
+    ax.invert_yaxis()
     plt.show()
+
 
 def convert_dict_to_mean_df(data_dict, mean = True):
     dfs = []

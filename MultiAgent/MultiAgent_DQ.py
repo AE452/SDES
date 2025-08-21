@@ -25,12 +25,16 @@ class StateTransition:
 
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
-    def __init__(self, e, lambda_val, alpha, delta, random_uniform, tolerance, M, verbose=False):
+    def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, case_id = None, verbose=False):
         self.e = e
         self.lambda_val = lambda_val
         self.alpha = alpha
         self.delta = delta
-        self.random_uniform = random_uniform
+        self.init_mode = init_mode
+        if init_mode == "fixed":
+            self.case_id = case_id
+        else:
+            self.case_id = None
         self.tolerance = tolerance
         self.M = M
         self.verbose = verbose
@@ -46,15 +50,71 @@ class Algorithm:
         self.eqD = np.zeros((1, M))
 
     def initialize_q_values(self):
-        """Initializes the Q-values randomly."""
-        if self.random_uniform:
-                q1 = latin_hypercube_sampling(1, self.delta)
-                q2 = latin_hypercube_sampling(1, self.delta)
-        else:
+        """
+        Initializes the Q-values for the two agents.
+
+        Parameters
+        ----------
+        mode : str
+            "random" (default) → keep using LHS/complete sampling
+            "fixed" → use one of the 8 predefined systematic cases
+        case_id : int, optional
+            Required if mode="fixed". An integer 0–7 specifying which configuration to use.
+
+        Returns
+        -------
+        q1, q2 : list[float], list[float]
+            Initial Q-values for agent 1 and agent 2.
+        """
+
+        if self.init_mode == "latin":
+            
+            q1 = latin_hypercube_sampling(1, self.delta)
+            q2 = latin_hypercube_sampling(1, self.delta)
+        elif self.init_mode == "uniform":
             q1 = generate_unique_complete_samplings(1, self.delta)
             q2 = generate_unique_complete_samplings(1, self.delta)
 
+        elif self.init_mode == "fixed":
+            # define strong/weak biases
+            
+            strong_AD = np.array([[1.0, 0.0],
+                      [0.0, 1.0]])
+
+            strong_GT = np.array([[0.0, 0.0],
+                                [1.0, 1.0]])
+
+            weak_AD = np.array([[0.7, 0.3],
+                                [0.3, 0.7]])
+
+            weak_GT = np.array([[0.4, 0.4],
+                                [0.6, 0.6]])
+
+
+
+
+            # 8 systematic cases
+            cases = {
+                0: (strong_AD, strong_AD),  # both strongly AD
+                1: (strong_GT, strong_GT),  # both strongly GT
+                2: (strong_AD, strong_GT),  # P1 strong AD, P2 strong GT
+                3: (strong_GT, strong_AD),  # P1 strong GT, P2 strong AD
+                4: (weak_AD, weak_AD),      # both weakly AD
+                5: (weak_GT, weak_GT),      # both weakly GT
+                6: (weak_AD, weak_GT),      # P1 weak AD, P2 weak GT
+                7: (weak_GT, weak_AD),      # P1 weak GT, P2 weak AD
+            }
+
+            if self.case_id not in cases:
+                raise ValueError(f"When mode='fixed', case_id must be 0–7, got {self.case_id}")
+
+            q1, q2 = cases[self.case_id]
+
+        else:
+            raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")
+
         return q1, q2
+
     
 
     def run(self, verbose=False):

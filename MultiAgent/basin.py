@@ -288,8 +288,9 @@ class VectorFieldPlotter:
         ax.set_xlim(-self.bound, self.bound)
         ax.set_ylim(-self.bound, self.bound)
         ax.set_aspect('equal')
-        ax.set_xlabel(f"Agent 1: Pr({self.x_state[-1]})", fontsize=12)
-        ax.set_ylabel(f"Agent 2: Pr({self.y_state[-1]})", fontsize=12)
+        
+        ax.set_xlabel("Agent 1: ΔQ", fontsize=12)
+        ax.set_ylabel("Agent 2: ΔQ", fontsize=12)
         ax.set_title('Strategy Vector Field', fontsize=14)
         # Center reference lines
         ax.axhline(0, color='gray', linestyle=':', alpha=0.5)

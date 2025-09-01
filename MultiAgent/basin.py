@@ -4,13 +4,19 @@ from matplotlib import cm
 # --------------------------------------------------------
 # Geometric interpretation of strategies and Best Responses
 # 
-# Each strategy corresponds to a point in a 2D plane (quadrants):
-#   AD  -> (+,+) : Quadrant I   (top-right)
-#   GT  -> (-,+) : Quadrant II  (top-left)
-#   AGT -> (+,-) : Quadrant IV  (bottom-right)
-#   AC  -> (-,-) : Quadrant III (bottom-left)
-#
 # --------------------------------------------------------
+# 2D ΔQ plane representation:
+#   x-axis → ΔQ for Agent 1
+#   y-axis → ΔQ for Agent 2
+# Each point represents the current state of both agents in ΔQ space.
+# The quadrants indicate where the equilibrium or point of interest lies:
+#   Quadrant I   (+,+)
+#   Quadrant II  (-,+)
+#   Quadrant III (-,-)
+#   Quadrant IV  (+,-)
+# Vectors show the expected evolution of ΔQs toward best-response equilibria.
+# --------------------------------------------------------
+#
 # Best Response (BR) mapping for discrete strategies:
 #
 # Each strategy is a discrete action: AD, GT, AGT, AC.

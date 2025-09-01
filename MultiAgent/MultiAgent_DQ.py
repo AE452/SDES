@@ -93,7 +93,7 @@ class Algorithm:
 
 
 
-            # 8 systematic cases
+            # 16 systematic cases
             cases = {
                 0: (strong_AD, strong_AD),  # both strongly AD
                 1: (strong_GT, strong_GT),  # both strongly GT
@@ -114,8 +114,6 @@ class Algorithm:
             raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")
 
         return q1, q2
-
-    
 
     def run(self, verbose=False):
         """Runs the main algorithm."""

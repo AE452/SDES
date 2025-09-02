@@ -78,32 +78,8 @@ class Algorithm:
         elif self.init_mode == "fixed":
             # define strong/weak biases
             
-            strong_AD = np.array([[5.0, 0.0],
-                      [0.0, 5.0]])
-
-            strong_GT = np.array([[0.2, 0.3],
-                                [4.0, 2.0]])
-
-            weak_AD = np.array([[4.0, 1.3],
-                                [2.3, 4.7]])
-
-            weak_GT = np.array([[4.4, 4.2],
-                                [3.3, 3.6]])
-
-
-
-
-            # 16 systematic cases
-            cases = {
-                0: (strong_AD, strong_AD),  # both strongly AD
-                1: (strong_GT, strong_GT),  # both strongly GT
-                2: (strong_AD, strong_GT),  # P1 strong AD, P2 strong GT
-                3: (strong_GT, strong_AD),  # P1 strong GT, P2 strong AD
-                4: (weak_AD, weak_AD),      # both weakly AD
-                5: (weak_GT, weak_GT),      # both weakly GT
-                6: (weak_AD, weak_GT),      # P1 weak AD, P2 weak GT
-                7: (weak_GT, weak_AD),      # P1 weak GT, P2 weak AD
-            }
+            #still randomize but with the correct ordering of the Qvalues
+            #initial possible strategy pair: 
 
             if self.case_id not in cases:
                 raise ValueError(f"When mode='fixed', case_id must be 0–7, got {self.case_id}")

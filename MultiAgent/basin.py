@@ -311,7 +311,7 @@ class VectorFieldPlotter:
 
     def plot_subplots(self):
         """Generates two subplots: one for (StateC, StateC) and one for (StateD, StateD)."""
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True, sharey=True)
+        fig, axes = plt.subplots(1, 2, figsize=(15, 10), sharex=True, sharey=True, constrained_layout=True)
 
         # --- Subplot 1: (StateC, StateC) ---
         ax = axes[0]
@@ -367,9 +367,13 @@ class VectorFieldPlotter:
         ax.set_ylim(-self.bound, self.bound)
         ax.set_aspect('equal')
         ax.legend()
+        
 
-        plt.suptitle("Strategy Vector Fields", fontsize=16)
+        plt.suptitle("Strategy Vector Fields", fontsize=16, y=1.02)  # adjust y to lift title
+
         plt.tight_layout()
-        plt.subplots_adjust(wspace=0.1)
+        plt.subplots_adjust(wspace=0.1)   # smaller = less gap between subplots
         plt.show()
+        
+
 

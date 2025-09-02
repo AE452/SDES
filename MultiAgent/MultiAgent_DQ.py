@@ -22,19 +22,53 @@ class StateTransition:
         self.pi_eqC = np.array([[1 - e / 2, e / 2], [e / 2, 1 - e / 2]])
         self.pi_eqD = np.array([[e / 2, e / 2], [1 - e / 2, 1 - e / 2]])
 
+strategies = ["AD", "GT", "AGT", "AC"]
+
+def generate_q_for_strategy(strategy, delta, T=1.0):
+    """
+    Generate a 2x2 Q-matrix that satisfies the inequalities
+    corresponding to a given strategy.
+    """
+    upper_limit = T / (1 - delta)
+    
+    # Start with random values
+    Q = np.random.uniform(0, upper_limit, (2, 2))
+
+    # Enforce inequalities depending on strategy
+    if strategy == "AD":   # Q1 < Q3 and Q2 < Q4
+        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
+        if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
+
+    elif strategy == "GT": # Q1 > Q3 and Q2 < Q4
+        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
+        if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
+
+    elif strategy == "AGT": # Q1 > Q3 and Q2 > Q4
+        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
+        if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
+
+    elif strategy == "AC":  # Q1 < Q3 and Q2 > Q4
+        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
+        if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
+
+    return Q
+
+
+
 
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
-    def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, case_id = None, verbose=False):
+    def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1= None,  strategy2= None, verbose=False):
         self.e = e
         self.lambda_val = lambda_val
         self.alpha = alpha
         self.delta = delta
         self.init_mode = init_mode
-        if init_mode == "fixed":
-            self.case_id = case_id
-        else:
-            self.case_id = None
+        if self.init_mode == "fixed":
+            if strategy1 is None or strategy2 is None:
+                raise ValueError("For init_mode='fixed', you must provide strategy1 and strategy2 lists.")
+            self.strategy1 = strategy1
+            self.strategy2 = strategy2
         self.tolerance = tolerance
         self.M = M
         self.verbose = verbose
@@ -76,15 +110,19 @@ class Algorithm:
             q2 = generate_unique_complete_samplings(1, self.delta)
 
         elif self.init_mode == "fixed":
-            # define strong/weak biases
-            
-            #still randomize but with the correct ordering of the Qvalues
-            #initial possible strategy pair: 
+            # Ensure the user passed the strategies
+            if not hasattr(self, "strategy1") or not hasattr(self, "strategy2"):
+                raise ValueError("For init_mode='fixed', you must provide strategy1 and strategy2 as strings.")
+            if not isinstance(self.strategy1, str) or not isinstance(self.strategy2, str):
+                raise TypeError("strategy1 and strategy2 must be strings, e.g., 'AD', 'GT'")
 
-            if self.case_id not in cases:
-                raise ValueError(f"When mode='fixed', case_id must be 0–7, got {self.case_id}")
+            # Use exactly the specified strategies
+            s1 = self.strategy1
+            s2 = self.strategy2
 
-            q1, q2 = cases[self.case_id]
+            # Generate Q-matrices consistent with that pair
+            q1 = generate_q_for_strategy(s1, self.delta)
+            q2 = generate_q_for_strategy(s2, self.delta)
 
         else:
             raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")

@@ -100,44 +100,46 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
                      [first_term, second_term]])
 
 
-class VectorFieldPlot:
+class VectorFieldAutomatic:
     """
-    Plots vector fields from two Q-functions (func1 for x, func2 for y),
-    with trajectories from Q-learning runs and Basin of Attraction (BoA) boundary.
+    Vector field plotter automatico come Mathematica:
+    - ΔQ calcolato per ogni punto della meshgrid
+    - Gestisce automaticamente uno o più equilibri
+    - Due subplots: StateC-StateC e StateD-StateD
+    - Traiettorie e BoA incluse
     """
 
     def __init__(self, q1=None, q2=None,
-                 t=1, r=3, p=0, s=5, epsilon=0.01, d=0.9,
+                 t=1, r=0.8, p=0.2, s=0,
+                 epsilon=0.1, d=0.7,
                  func1=None, func2=None,
-                 alpha=0.1, bound=1.0,
-                 method="quiver", cmap=plt.cm.viridis,
+                 alpha=0.3, density=15,
                  show_trajectory=True, show_basin=True):
-
+        
         self.q1 = q1
         self.q2 = q2
         self.t, self.r, self.p, self.s = t, r, p, s
-        self.epsilon, self.d = epsilon, d
-        self.alpha, self.bound = alpha, bound
-        self.show_trajectory, self.show_basin = show_trajectory, show_basin
-        self.method, self.cmap = method, cmap
-        self.eps = 1e-8
+        self.epsilon = epsilon
+        self.delta = d
+        self.alpha = alpha
+        self.density = density
+        self.show_trajectory = show_trajectory
+        self.show_basin = show_basin
 
-        self.func1 = func1  # x-component Q-function
-        self.func2 = func2  # y-component Q-function
+        self.func1 = func1
+        self.func2 = func2
+
+        self.bound = 1 / (1 - self.delta)
 
         if self.show_trajectory:
             if self.q1 is None or self.q2 is None:
                 raise ValueError("q1 and q2 must be provided if show_trajectory is True.")
             self.prepare_states()
-        else:
-            self.xC = self.yC = self.uC = self.vC = None
-            self.xD = self.yD = self.uD = self.vD = None
 
-        self.compute_deltas()
-        self.compute_boa_curve()  # compute smooth BoA
+        self.compute_boa()
 
     def prepare_states(self):
-        """Computes StateC and StateD trajectories for both agents."""
+        """Calcola StateC e StateD per le traiettorie."""
         self.q1['StateC'] = self.q1['Q3'] - self.q1['Q1']
         self.q1['StateD'] = self.q1['Q4'] - self.q1['Q2']
         self.q2['StateC'] = self.q2['Q3'] - self.q2['Q1']
@@ -149,73 +151,98 @@ class VectorFieldPlot:
         self.xD, self.yD = self.q1['StateD'].values, self.q2['StateD'].values
         self.uD, self.vD = self.xD[1:] - self.xD[:-1], self.yD[1:] - self.yD[:-1]
 
-    def compute_deltas(self):
-        """Compute ΔQ for vector field."""
-        Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.d)
-        Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.d)
+    def compute_boa(self):
+        """Calcola BoA (basin of attraction) dalle funzioni Q in (0,0)."""
+        if self.func1 is None or self.func2 is None:
+            self.boa_x = self.boa_y = None
+            return
 
-        self.dx = Q1[0][0] - Q1[0][1]
-        self.dy = Q2[0][0] - Q2[0][1]
+        Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
+        Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
 
-        self.Q1, self.Q2 = Q1, Q2  # store for vector fields
+        dx = Q1[0] - Q1[1]
+        dy = Q2[0] - Q2[1]
 
-    def compute_boa_curve(self, num_points=100):
-        """Compute smooth Basin of Attraction curve."""
-        inv_scale_dx = 1 / (abs((1 - self.d) * self.dx) + self.eps)
-        inv_scale_dy = 1 / (abs((1 - self.d) * self.dy) + self.eps)
-        scale = min(inv_scale_dx, inv_scale_dy)
+        scale = min(1 / ((1 - self.delta) * abs(dx) + 1e-8),
+                    1 / ((1 - self.delta) * abs(dy) + 1e-8))
+        self.boa_x = np.array([0, -scale * dx])
+        self.boa_y = np.array([0, -scale * dy])
 
-        t = np.linspace(0, 1, num_points)
-        self.boa_x = -t * scale * self.dx
-        self.boa_y = -t * scale * self.dy
+    def vector_field(self, X, Y, func):
+        """
+        Calcola ΔQ per ogni punto (X,Y) usando la funzione Q.
+        """
+        U = np.zeros_like(X)
+        V = np.zeros_like(Y)
 
-    def field(self, X, Y, idx):
-        """Vector field using row idx (0 or 1)."""
-        U = self.alpha * (self.Q1[idx][0] - self.Q1[idx][1] - X)
-        V = self.alpha * (self.Q2[idx][0] - self.Q2[idx][1] - Y)
-        return U, V
+        if func is None:
+            return U, V
 
-    def add_vector_field(self, ax, field_func, x_range, y_range, density=15):
-        x_vals = np.linspace(x_range[0], x_range[1], density)
-        y_vals = np.linspace(y_range[0], y_range[1], density)
-        X, Y = np.meshgrid(x_vals, y_vals)
-        U, V = field_func(X, Y)
-        ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=3)
+        Q = func(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
+
+        dQx = Q[0] - Q[1]
+        dQy = Q[0] - Q[1]
+
+        U = self.alpha * (dQx - X)
+        V = self.alpha * (dQy - Y)
+
+        mag = np.sqrt(U**2 + V**2) + 1e-8
+        return U / mag, V / mag
+
+    def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func):
+        """Aggiunge vettori al plot calcolati punto-per-punto."""
+        X_vals = np.linspace(xmin, xmax, self.density)
+        Y_vals = np.linspace(ymin, ymax, self.density)
+        X, Y = np.meshgrid(X_vals, Y_vals)
+        U, V = self.vector_field(X, Y, func)
+        ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=12,
+                  color='black', alpha=0.7, width=0.003)
 
     def plot(self):
-        """Generates the vector field plot with trajectories and smooth BoA curve."""
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True, sharey=True)
+        """Disegna due subplots: StateC-StateC e StateD-StateD."""
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
 
-        for i, ax in enumerate(axes):
-            # vector fields from row i (0 and 1)
-            self.add_vector_field(ax, lambda X, Y, idx=i: self.field(X, Y, idx),
-                                  (-self.bound, self.bound), (-self.bound, self.bound))
+        for i, (x_attr, y_attr, u_attr, v_attr, state_name, func, color) in enumerate([
+            ('xC', 'yC', 'uC', 'vC', 'StateC', self.func1, 'blue'),
+            ('xD', 'yD', 'uD', 'vD', 'StateD', self.func2, 'orange')
+        ]):
+            ax = axes[i]
 
+            # Quadranti come in Mathematica
+            bound = self.bound
+            quadrants = [
+                (0, bound, -bound, 0),
+                (-bound, 0, -bound, 0),
+                (0, bound, 0, bound),
+                (-bound, 0, 0, bound)
+            ]
+            for xmin, xmax, ymin, ymax in quadrants:
+                self.add_vector_field(ax, xmin, xmax, ymin, ymax, func)
+
+            # Traiettoria
             if self.show_trajectory:
-                if i == 0:
-                    ax.quiver(self.xC[:-1], self.yC[:-1], self.uC, self.vC,
-                              angles='xy', scale_units='xy', scale=1,
-                              color='blue', alpha=0.6, label='Trajectory (StateC)')
-                else:
-                    ax.quiver(self.xD[:-1], self.yD[:-1], self.uD, self.vD,
-                              angles='xy', scale_units='xy', scale=1,
-                              color='orange', alpha=0.6, label='Trajectory (StateD)')
+                x = getattr(self, x_attr)
+                y = getattr(self, y_attr)
+                u = getattr(self, u_attr)
+                v = getattr(self, v_attr)
+                ax.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1,
+                          color=color, alpha=0.8, width=0.004, label=f'Trajectory {state_name}')
+                ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
 
-            if self.show_basin:
-                ax.plot(self.boa_x, self.boa_y,
-                        color='red', linewidth=2, label='BoA Boundary')
+            # BoA
+            if self.show_basin and self.boa_x is not None:
+                ax.plot(self.boa_x, self.boa_y, color='red', linewidth=2, label='BoA Boundary')
 
             ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
             ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
-            ax.set_xlim(-self.bound, self.bound)
-            ax.set_ylim(-self.bound, self.bound)
+            ax.set_xlim(-bound, bound)
+            ax.set_ylim(-bound, bound)
             ax.set_aspect('equal')
-            ax.set_xlabel("Agent 1: ΔQ")
-            ax.set_ylabel("Agent 2: ΔQ")
-            ax.legend()
-            ax.set_title(f"Vector Field {i+1}")
+            ax.set_xlabel(f'Agent 1 ΔQ ({state_name})')
+            ax.set_ylabel(f'Agent 2 ΔQ ({state_name})')
+            ax.set_title(f'{state_name} vs {state_name}')
+            ax.grid(True, alpha=0.2)
+            ax.legend(fontsize=8)
 
         plt.tight_layout()
         plt.show()
-
-

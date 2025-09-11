@@ -35,6 +35,7 @@ def generate_q_for_strategy(strategy, delta, T=1.0):
     Q = np.random.uniform(0, upper_limit, (2, 2))
 
     # Enforce inequalities depending on strategy
+    #(GT, AGT): top left, bottom right [to check]
     if strategy == "AD":   # Q1 < Q3 and Q2 < Q4
         if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])

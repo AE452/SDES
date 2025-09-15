@@ -31,16 +31,16 @@ from matplotlib import cm
 #     is stable and the lower part "flows" toward the top-right (AD).
 # --------------------------------------------------------
 
-
+# Q value difference is: (defect action - cooperate action)
 def QvaluesADvsAD(t, r, p, s, epsilon, d):
     denom = 2 * (d - 1)  # equivalent to 2*(-1 + d)
     
-    first_term = -((2*p - epsilon*p + epsilon*t) / denom)
+    first_term = -((2*p - epsilon*p + epsilon*t) / denom) #defect action
     second_term = -( (2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r 
-                      + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t) / denom )
+                      + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t) / denom ) #cooperate action
     
-    return np.array([[first_term, second_term],
-                     [first_term, second_term]])
+    return np.array([[first_term, second_term], #StateC (CC)
+                     [first_term, second_term]]) #StateD (CD, DC, DD)
 
 
 def QvaluesADvsAGT(t, r, p, s, epsilon, d):
@@ -99,13 +99,16 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
     return np.array([[first_term, second_term],
                      [first_term, second_term]])
 
+#TODO: BC (Both Cooperated) and A1D (At least 1 defected)
+
+
 
 class VectorFieldAutomatic:
     """
     Vector field plotter automatico come Mathematica:
     - ΔQ calcolato per ogni punto della meshgrid
     - Gestisce automaticamente uno o più equilibri
-    - Due subplots: StateC-StateC e StateD-StateD
+    - Due subplots: StateC e StateD
     - Traiettorie e BoA incluse
     """
 
@@ -151,7 +154,8 @@ class VectorFieldAutomatic:
         self.xD, self.yD = self.q1['StateD'].values, self.q2['StateD'].values
         self.uD, self.vD = self.xD[1:] - self.xD[:-1], self.yD[1:] - self.yD[:-1]
 
-    def compute_boa(self):
+    def compute_boa(self, idx):
+        #TODO: add idx
         """Calcola BoA (basin of attraction) dalle funzioni Q in (0,0)."""
         if self.func1 is None or self.func2 is None:
             self.boa_x = self.boa_y = None
@@ -180,6 +184,7 @@ class VectorFieldAutomatic:
 
         Q = func(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
 
+
         dQx = Q[0] - Q[1]
         dQy = Q[0] - Q[1]
 
@@ -195,6 +200,7 @@ class VectorFieldAutomatic:
         X, Y = np.meshgrid(X_vals, Y_vals)
         
         # Compute vector field: ΔQx from func1, ΔQy from func2
+        # 
         Q1 = func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
         Q2 = func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
         
@@ -208,7 +214,7 @@ class VectorFieldAutomatic:
         ax.quiver(X, Y, U/mag, V/mag, angles='xy', scale_units='xy', scale=12,
                 color='black', alpha=0.7, width=0.003)
 
-
+    
     def plot(self):
         """Design two subplots: StateC-StateC e StateD-StateD."""
         fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)

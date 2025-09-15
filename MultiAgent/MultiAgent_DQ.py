@@ -36,6 +36,7 @@ def generate_q_for_strategy(strategy, delta, T=1.0):
 
     # Enforce inequalities depending on strategy
     #(GT, AGT): top left, bottom right [to check]
+    #adapt based on the change of func1[s2] and func2[s1]
     if strategy == "AD":   # Q1 < Q3 and Q2 < Q4
         if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])

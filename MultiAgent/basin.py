@@ -168,9 +168,9 @@ class VectorFieldAutomatic:
         self.boa_x = np.array([0, -scale * dx])
         self.boa_y = np.array([0, -scale * dy])
 
-    def vector_field(self, X, Y, func):
+    def vector_field(self, X, Y, func, idx):
         """
-        Calcola ΔQ per ogni punto (X,Y) usando la funzione Q.
+        Calculate ΔQ for each point (X,Y) using the function Q.
         """
         U = np.zeros_like(X)
         V = np.zeros_like(Y)
@@ -178,7 +178,7 @@ class VectorFieldAutomatic:
         if func is None:
             return U, V
 
-        Q = func(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
+        Q = func(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
 
         dQx = Q[0] - Q[1]
         dQy = Q[0] - Q[1]
@@ -189,26 +189,39 @@ class VectorFieldAutomatic:
         mag = np.sqrt(U**2 + V**2) + 1e-8
         return U / mag, V / mag
 
-    def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func):
-        """Aggiunge vettori al plot calcolati punto-per-punto."""
+    def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func1, func2, idx):
         X_vals = np.linspace(xmin, xmax, self.density)
         Y_vals = np.linspace(ymin, ymax, self.density)
         X, Y = np.meshgrid(X_vals, Y_vals)
-        U, V = self.vector_field(X, Y, func)
-        ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=12,
-                  color='black', alpha=0.7, width=0.003)
+        
+        # Compute vector field: ΔQx from func1, ΔQy from func2
+        Q1 = func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
+        Q2 = func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
+        
+        dQx = Q1[0] - Q1[1]
+        dQy = Q2[0] - Q2[1]
+
+        U = self.alpha * (dQx - X)
+        V = self.alpha * (dQy - Y)
+
+        mag = np.sqrt(U**2 + V**2) + 1e-8
+        ax.quiver(X, Y, U/mag, V/mag, angles='xy', scale_units='xy', scale=12,
+                color='black', alpha=0.7, width=0.003)
+
 
     def plot(self):
-        """Disegna due subplots: StateC-StateC e StateD-StateD."""
+        """Design two subplots: StateC-StateC e StateD-StateD."""
         fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
 
-        for i, (x_attr, y_attr, u_attr, v_attr, state_name, func, color) in enumerate([
-            ('xC', 'yC', 'uC', 'vC', 'StateC', self.func1, 'blue'),
-            ('xD', 'yD', 'uD', 'vD', 'StateD', self.func2, 'orange')
-        ]):
+        subplots = [
+            ('StateC', 0),  # first array
+            ('StateD', 1)   # second array
+        ]
+
+        for i, (state_name, idx) in enumerate(subplots):
             ax = axes[i]
 
-            # Quadranti come in Mathematica
+            # Quadrants
             bound = self.bound
             quadrants = [
                 (0, bound, -bound, 0),
@@ -217,16 +230,18 @@ class VectorFieldAutomatic:
                 (-bound, 0, 0, bound)
             ]
             for xmin, xmax, ymin, ymax in quadrants:
-                self.add_vector_field(ax, xmin, xmax, ymin, ymax, func)
+                # Use both func1 and func2 for each subplot with correct idx
+                self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
 
             # Traiettoria
             if self.show_trajectory:
-                x = getattr(self, x_attr)
-                y = getattr(self, y_attr)
-                u = getattr(self, u_attr)
-                v = getattr(self, v_attr)
+                x = getattr(self, f'x{state_name[-1]}')
+                y = getattr(self, f'y{state_name[-1]}')
+                u = getattr(self, f'u{state_name[-1]}')
+                v = getattr(self, f'v{state_name[-1]}')
+                color = 'blue' if state_name == 'StateC' else 'orange'
                 ax.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1,
-                          color=color, alpha=0.8, width=0.004, label=f'Trajectory {state_name}')
+                        color=color, alpha=0.8, width=0.004, label=f'Trajectory {state_name}')
                 ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
 
             # BoA

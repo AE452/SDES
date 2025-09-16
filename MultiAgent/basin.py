@@ -102,7 +102,6 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
 #TODO: BC (Both Cooperated) and A1D (At least 1 defected)
 
 
-
 class VectorFieldAutomatic:
     """
     Vector field plotter automatico come Mathematica:
@@ -139,7 +138,6 @@ class VectorFieldAutomatic:
                 raise ValueError("q1 and q2 must be provided if show_trajectory is True.")
             self.prepare_states()
 
-        self.compute_boa()
 
     def prepare_states(self):
         """Calcola StateC e StateD per le traiettorie."""
@@ -155,22 +153,23 @@ class VectorFieldAutomatic:
         self.uD, self.vD = self.xD[1:] - self.xD[:-1], self.yD[1:] - self.yD[:-1]
 
     def compute_boa(self, idx):
-        #TODO: add idx
-        """Calcola BoA (basin of attraction) dalle funzioni Q in (0,0)."""
+        
+        """Calculation of the basin of attraction boundary."""
         if self.func1 is None or self.func2 is None:
-            self.boa_x = self.boa_y = None
+            boa_x = boa_y = None
             return
 
-        Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
-        Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[0]
+        Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
+        Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
 
         dx = Q1[0] - Q1[1]
         dy = Q2[0] - Q2[1]
 
         scale = min(1 / ((1 - self.delta) * abs(dx) + 1e-8),
                     1 / ((1 - self.delta) * abs(dy) + 1e-8))
-        self.boa_x = np.array([0, -scale * dx])
-        self.boa_y = np.array([0, -scale * dy])
+        boa_x = np.array([0, -scale * dx])
+        boa_y = np.array([0, -scale * dy])
+        return boa_x, boa_y
 
     def vector_field(self, X, Y, func, idx):
         """
@@ -251,8 +250,10 @@ class VectorFieldAutomatic:
                 ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
 
             # BoA
-            if self.show_basin and self.boa_x is not None:
-                ax.plot(self.boa_x, self.boa_y, color='red', linewidth=2, label='BoA Boundary')
+            if self.show_basin:
+                boa_x, boa_y = self.compute_boa(idx)
+                if boa_x is not None and boa_y is not None:
+                    ax.plot(boa_x, boa_y, color='red', linewidth=2, label='BoA Boundary')
 
             ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
             ax.axvline(0, color='gray', linestyle=':', alpha=0.5)

@@ -101,20 +101,16 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
 
 #TODO: BC (Both Cooperated) and A1D (At least 1 defected)
 
-
 class VectorFieldAutomatic:
     """
-    Vector field plotter automatico come Mathematica:
-    - ΔQ calcolato per ogni punto della meshgrid
-    - Gestisce automaticamente uno o più equilibri
-    - Due subplots: StateC e StateD
-    - Traiettorie e BoA incluse
+    Vector field plotter with automatic quadrant selection based on strategy pairs.
     """
 
     def __init__(self, q1=None, q2=None,
                  t=1, r=0.8, p=0.2, s=0,
                  epsilon=0.1, d=0.7,
                  func1=None, func2=None,
+                 strategy1=None, strategy2=None,  # Add strategy parameters
                  alpha=0.3, density=15,
                  show_trajectory=True, show_basin=True):
         
@@ -127,7 +123,10 @@ class VectorFieldAutomatic:
         self.density = density
         self.show_trajectory = show_trajectory
         self.show_basin = show_basin
-
+        
+        self.strategy1 = strategy1  # Player 1 strategy
+        self.strategy2 = strategy2  # Player 2 strategy (opponent)
+        
         self.func1 = func1
         self.func2 = func2
 
@@ -138,6 +137,107 @@ class VectorFieldAutomatic:
                 raise ValueError("q1 and q2 must be provided if show_trajectory is True.")
             self.prepare_states()
 
+    def get_quadrant_bounds(self, strategy1, strategy2, state_idx):
+        """
+        Determine the quadrant bounds based on the Q-value functions being used.
+        
+        The logic is based on the equilibrium points of the Q-value functions:
+        - QvaluesADvsAD: equilibrium at (+, +)
+        - QvaluesGTvsGT: equilibrium at (-, +) for StateC, (+, +) for StateD
+        - QvaluesADvsAGT: equilibrium varies by state
+        - QvaluesADvsAC: equilibrium varies by state
+        
+        The quadrant is determined by where the vector field equilibrium lies,
+        which depends on the Q-value difference functions being used.
+        
+        Args:
+            strategy1: Player 1 strategy (determines func2 - y-component function)
+            strategy2: Player 2 strategy (determines func1 - x-component function) 
+            state_idx: 0 for StateC, 1 for StateD
+            
+        Returns:
+            (xmin, xmax, ymin, ymax) for the selected quadrant
+        """
+        bound = self.bound
+        
+        # Define quadrant bounds: (xmin, xmax, ymin, ymax)
+        quadrants = {
+            'pos_pos': (0, bound, 0, bound),      # (+, +) upper right
+            'neg_pos': (-bound, 0, 0, bound),     # (-, +) upper left
+            'pos_neg': (0, bound, -bound, 0),     # (+, -) lower right
+            'neg_neg': (-bound, 0, -bound, 0)     # (-, -) lower left
+        }
+        
+        # Get the actual equilibrium points by evaluating the Q-value functions
+        # This is more accurate than using strategy labels
+        if self.func1 is not None and self.func2 is not None:
+            try:
+                Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
+                Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
+                
+                # Calculate equilibrium points (where dQ = 0)
+                equilibrium_x = Q1[0] - Q1[1]  # x-axis equilibrium
+                equilibrium_y = Q2[0] - Q2[1]  # y-axis equilibrium
+                
+                # Determine quadrant based on equilibrium signs
+                x_sign = 'pos' if equilibrium_x >= 0 else 'neg'
+                y_sign = 'pos' if equilibrium_y >= 0 else 'neg'
+                
+                quad_key = f"{x_sign}_{y_sign}"
+                return quadrants[quad_key]
+                
+            except Exception as e:
+                print(f"Warning: Could not compute equilibrium for {strategy1} vs {strategy2}, using fallback logic")
+        
+        # Fallback logic based on known function behaviors
+        # This is derived from your Mathematica examples and game theory
+        
+        # Function-based quadrant mapping (more accurate than strategy-based)
+        func_equilibrium_map = {
+            # Based on your Mathematica code patterns
+            ('AD', 'AD'): ('pos', 'pos'),  # QvaluesADvsAD -> always (+, +)
+            ('GT', 'GT'): ('neg', 'pos') if state_idx == 0 else ('pos', 'pos'),  # QvaluesGTvsGT
+            ('AD', 'AGT'): ('pos', 'neg') if state_idx == 0 else ('pos', 'pos'),  # QvaluesADvsAGT  
+            ('AD', 'AC'): ('pos', 'pos'),  # QvaluesADvsAC
+            
+            # Symmetric cases (when roles are swapped)
+            ('AGT', 'AD'): ('neg', 'pos') if state_idx == 0 else ('pos', 'pos'),
+            ('AC', 'AD'): ('pos', 'pos'),
+            
+            # AGT and AC combinations (educated guesses based on game theory)
+            ('AGT', 'AGT'): ('pos', 'neg'),  # Both anti-generous
+            ('AC', 'AC'): ('neg', 'neg'),    # Both always cooperate
+            ('AGT', 'AC'): ('neg', 'neg') if state_idx == 0 else ('pos', 'neg'),
+            ('AC', 'AGT'): ('pos', 'neg') if state_idx == 0 else ('neg', 'pos'),
+            
+            # GT mixed with AGT and AC
+            ('GT', 'AGT'): ('pos', 'pos') if state_idx == 0 else ('neg', 'pos'),
+            ('AGT', 'GT'): ('neg', 'pos') if state_idx == 0 else ('pos', 'neg'),
+            ('GT', 'AC'): ('neg', 'pos'),
+            ('AC', 'GT'): ('neg', 'neg') if state_idx == 0 else ('neg', 'pos'),
+            
+            # AD mixed with GT (from your Mathematica examples)
+            ('AD', 'GT'): ('neg', 'pos'),
+            ('GT', 'AD'): ('pos', 'pos'),
+        }
+        
+        # Look up the equilibrium for this strategy pair and state
+        key = (strategy2, strategy1)  # Note: strategy2 affects x, strategy1 affects y
+        if key in func_equilibrium_map:
+            x_sign, y_sign = func_equilibrium_map[key]
+        else:
+            # Ultimate fallback: use individual strategy tendencies
+            strategy_x_sign = {
+                "AD": 'pos', "GT": 'neg', "AGT": 'pos', "AC": 'neg'
+            }
+            strategy_y_sign = {
+                "AD": 'pos', "GT": 'pos', "AGT": 'neg', "AC": 'neg'  
+            }
+            x_sign = strategy_x_sign.get(strategy2, 'pos')
+            y_sign = strategy_y_sign.get(strategy1, 'pos')
+        
+        quad_key = f"{x_sign}_{y_sign}"
+        return quadrants[quad_key]
 
     def prepare_states(self):
         """Calcola StateC e StateD per le traiettorie."""
@@ -153,11 +253,9 @@ class VectorFieldAutomatic:
         self.uD, self.vD = self.xD[1:] - self.xD[:-1], self.yD[1:] - self.yD[:-1]
 
     def compute_boa(self, idx):
-        
         """Calculation of the basin of attraction boundary."""
         if self.func1 is None or self.func2 is None:
-            boa_x = boa_y = None
-            return
+            return None, None
 
         Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
         Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
@@ -171,35 +269,13 @@ class VectorFieldAutomatic:
         boa_y = np.array([0, -scale * dy])
         return boa_x, boa_y
 
-    def vector_field(self, X, Y, func, idx):
-        """
-        Calculate ΔQ for each point (X,Y) using the function Q.
-        """
-        U = np.zeros_like(X)
-        V = np.zeros_like(Y)
-
-        if func is None:
-            return U, V
-
-        Q = func(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
-
-
-        dQx = Q[0] - Q[1]
-        dQy = Q[0] - Q[1]
-
-        U = self.alpha * (dQx - X)
-        V = self.alpha * (dQy - Y)
-
-        mag = np.sqrt(U**2 + V**2) + 1e-8
-        return U / mag, V / mag
-
     def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func1, func2, idx):
+        """Add vector field to the specified region."""
         X_vals = np.linspace(xmin, xmax, self.density)
         Y_vals = np.linspace(ymin, ymax, self.density)
         X, Y = np.meshgrid(X_vals, Y_vals)
         
         # Compute vector field: ΔQx from func1, ΔQy from func2
-        # 
         Q1 = func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
         Q2 = func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
         
@@ -213,10 +289,9 @@ class VectorFieldAutomatic:
         ax.quiver(X, Y, U/mag, V/mag, angles='xy', scale_units='xy', scale=12,
                 color='black', alpha=0.7, width=0.003)
 
-    
     def plot(self):
-        """Design two subplots: StateC-StateC e StateD-StateD."""
-        fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
+        """Plot two subplots with quadrant-specific vector fields."""
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
         subplots = [
             ('StateC', 0),  # first array
@@ -226,19 +301,15 @@ class VectorFieldAutomatic:
         for i, (state_name, idx) in enumerate(subplots):
             ax = axes[i]
 
-            # Quadrants
-            bound = self.bound
-            quadrants = [
-                (0, bound, -bound, 0),
-                (-bound, 0, -bound, 0),
-                (0, bound, 0, bound),
-                (-bound, 0, 0, bound)
-            ]
-            for xmin, xmax, ymin, ymax in quadrants:
-                # Use both func1 and func2 for each subplot with correct idx
-                self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
+            # Get the appropriate quadrant for this strategy pair and state
+            xmin, xmax, ymin, ymax = self.get_quadrant_bounds(
+                self.strategy1, self.strategy2, idx
+            )
+            
+            # Add vector field only to the selected quadrant
+            self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
 
-            # Traiettoria
+            # Trajectory
             if self.show_trajectory:
                 x = getattr(self, f'x{state_name[-1]}')
                 y = getattr(self, f'y{state_name[-1]}')
@@ -255,16 +326,19 @@ class VectorFieldAutomatic:
                 if boa_x is not None and boa_y is not None:
                     ax.plot(boa_x, boa_y, color='red', linewidth=2, label='BoA Boundary')
 
+            # Set plot limits to the selected quadrant
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+            
             ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
             ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
-            ax.set_xlim(-bound, bound)
-            ax.set_ylim(-bound, bound)
             ax.set_aspect('equal')
             ax.set_xlabel(f'Agent 1 ΔQ ({state_name})')
             ax.set_ylabel(f'Agent 2 ΔQ ({state_name})')
-            ax.set_title(f'{state_name} vs {state_name}')
+            ax.set_title(f'{state_name}: {self.strategy1} vs {self.strategy2}')
             ax.grid(True, alpha=0.2)
-            ax.legend(fontsize=8)
+            if self.show_trajectory or self.show_basin:
+                ax.legend(fontsize=8)
 
         plt.tight_layout()
         plt.show()

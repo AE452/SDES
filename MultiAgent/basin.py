@@ -34,32 +34,47 @@ from matplotlib import cm
 # Q value difference is: (defect action - cooperate action)
 
 # --------------------------------------------------------
-# How the automatic quadrant determination based on ΔQ values works:
+# How the automatic quadrant determination for strategy pairs works:
 #
-# The strategy-to-quadrant mapping (AD → (+,+), GT → (-,+), 
-# AGT → (+,-), AC → (-,-)) gives a geometric intuition of 
-# where each pure strategy lies in the ΔQ-plane.
+# The single-agent strategy-to-quadrant mapping:
+#   AD  → (+,+)
+#   GT  → (-,+)
+#   AGT → (+,-)
+#   AC  → (-,-)
+# describes the typical ΔQ signs for an individual agent.
 #
-# To automatically select the quadrant for plotting a given 
-# strategy pair and state, we compute the actual ΔQ values:
-#   - Player 1 (x-axis): dx = Qx[0] - Qx[1] (defect - cooperate)
-#   - Player 2 (y-axis): dy = Qy[0] - Qy[1]
+# However, for strategy pairs (s1, s2), this static mapping is 
+# insufficient:
+#   - Example: (AD, AD) → both agents in (+,+) quadrant, fine.
+#   - Example: (GT, AD) → agent 1's ΔQ might suggest (-,+) and 
+#                         agent 2's ΔQ suggests (+,+). Which quadrant 
+#                         to show? Only computing the actual ΔQ values 
+#                         can resolve this.
 #
-# Then assign signs:
-#   - x_sign = 'pos' if dx >= 0 else 'neg'
-#   - y_sign = 'pos' if dy >= 0 else 'neg'
+# To handle any strategy pair robustly:
+# 1. Compute ΔQ for both agents:
+#       dx = Qx[0] - Qx[1]  # x-axis (agent 1 or "player")
+#       dy = Qy[0] - Qy[1]  # y-axis (agent 2 or "opponent")
 #
-# The quadrant is determined from the combination of signs:
-#   ('pos','pos') → upper right
-#   ('neg','pos') → upper left
-#   ('pos','neg') → lower right
-#   ('neg','neg') → lower left
+# 2. Determine signs from these computed values:
+#       x_sign = 'pos' if dx >= 0 else 'neg'
+#       y_sign = 'pos' if dy >= 0 else 'neg'
 #
-# This approach ensures that the vector field and trajectory
-# initialization reflect the actual Q-value dynamics for
-# the selected strategy pair and state, making the plotting
-# fully automatic and robust.
+# 3. Map the signs to a quadrant:
+#       ('pos','pos') → upper right
+#       ('neg','pos') → upper left
+#       ('pos','neg') → lower right
+#       ('neg','neg') → lower left
+#
+# 4. Use this quadrant for both plotting the vector field 
+#    and initializing trajectories, ensuring consistency with 
+#    the actual dynamics for that strategy pair.
+#
+# This approach generalizes beyond single-agent expectations, 
+# making the visualization automatic and valid for any combination 
+# of strategies.
 # --------------------------------------------------------
+
 
 def QvaluesADvsAD(t, r, p, s, epsilon, d):
     denom = 2 * (d - 1)  # equivalent to 2*(-1 + d)

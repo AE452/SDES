@@ -4,13 +4,45 @@ import sys
 sys.path.append('../')
 from utils import *
 from basin import *
+
+# explanation about the FIXED INITIALIZATION: enforce_q_sign_for_state
+# ============================================================
+# Quadrants of ΔQ (defect − coop) in the plane (x=player1, y=player2)
+#
+#          ΔQ_y > 0  (player2 prefers defect)
+#                   ↑
+#                   |
+#   QII             |            QI
+# (x<0, y>0)        |        (x>0, y>0)
+#  P1 → cooperate   |         both → defect
+#  P2 → defect      |
+#                   |
+# ------------------+------------------→ ΔQ_x > 0
+#                   |        (player1 prefers defect)
+#                   |
+#  QIII             |            QIV
+# (x<0, y<0)        |        (x>0, y<0)
+# both → cooperate  |   P1 → defect
+#                   |   P2 → cooperate
+#
+# Interpretation:
+# - ΔQ_x > 0 → player1 prefers defect in the current state
+# - ΔQ_x < 0 → player1 prefers cooperate
+# - ΔQ_y > 0 → player2 prefers defect
+# - ΔQ_y < 0 → player2 prefers cooperate
+#
+# Usage:
+# - get_signs(...) → returns (x_sign, y_sign) expected from the model
+# - enforce_q_sign_for_state(...) → forces initial Q to match those signs
+#   → ensures trajectories start in the correct quadrant shown in the vector fields
+# ============================================================
+
 func_map = {
     "AD": QvaluesADvsAD,
     "GT": QvaluesGTvsGT,
     "AGT": QvaluesADvsAGT,
     "AC": QvaluesADvsAC
 }
-
 def enforce_q_sign_for_state(q, desired_sign, state_idx):
     """
     Enforce ΔQ sign (defect - coop) in one state by swapping

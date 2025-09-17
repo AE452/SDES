@@ -4,7 +4,45 @@ import sys
 sys.path.append('../')
 from utils import *
 from basin import *
-
+# ============================================================
+# What changed compared to the previous version?
+#
+# Original implementation (generate_q_for_strategy):
+# - Initialized Q-values randomly.
+# - Enforced inequalities for the chosen strategy
+#   (e.g., AD: Q1 < Q3 and Q2 < Q4).
+# - This ensured the Q-matrix matched the *strategic definition*,
+#   BUT it did NOT ensure that ΔQ = (Q_defect − Q_coop) signs
+#   matched the expected vector field quadrants.
+# - Result: trajectories sometimes started in the wrong quadrant.
+#
+# New implementation (added steps):
+# 1. get_signs(...)
+#    - Computes the expected signs (x_sign, y_sign) of ΔQ
+#      for each state directly from the theoretical model.
+#
+# 2. enforce_q_sign_for_state(...)
+#    - Checks the actual ΔQ sign from the initialized Q-matrix.
+#    - If inconsistent with the expected sign, swaps the entries
+#      so the sign matches.
+#    - Guarantees player incentives (defect vs cooperate)
+#      are aligned with the vector fields.
+#
+# 3. initialize_q_values(...) updated:
+#    - Before: only generated Q with inequalities.
+#    - Now:
+#        (a) generate Q with inequalities,
+#        (b) compute expected signs via get_signs,
+#        (c) enforce them with enforce_q_sign_for_state,
+#        (d) store the corrected Q as the initial state.
+#
+# Logic of the change:
+# - Before: only strategy inequalities were enforced.
+# - After: BOTH strategy inequalities AND correct ΔQ signs
+#   are enforced → initial trajectories always start in the
+#   same quadrant as shown in the vector field plots.
+# ============================================================
+# ============================================================
 # explanation about the FIXED INITIALIZATION: enforce_q_sign_for_state
 # ============================================================
 # Quadrants of ΔQ (defect − coop) in the plane (x=player1, y=player2)

@@ -32,6 +32,35 @@ from matplotlib import cm
 # --------------------------------------------------------
 
 # Q value difference is: (defect action - cooperate action)
+
+# --------------------------------------------------------
+# How the automatic quadrant determination based on ΔQ values works:
+#
+# The strategy-to-quadrant mapping (AD → (+,+), GT → (-,+), 
+# AGT → (+,-), AC → (-,-)) gives a geometric intuition of 
+# where each pure strategy lies in the ΔQ-plane.
+#
+# To automatically select the quadrant for plotting a given 
+# strategy pair and state, we compute the actual ΔQ values:
+#   - Player 1 (x-axis): dx = Qx[0] - Qx[1] (defect - cooperate)
+#   - Player 2 (y-axis): dy = Qy[0] - Qy[1]
+#
+# Then assign signs:
+#   - x_sign = 'pos' if dx >= 0 else 'neg'
+#   - y_sign = 'pos' if dy >= 0 else 'neg'
+#
+# The quadrant is determined from the combination of signs:
+#   ('pos','pos') → upper right
+#   ('neg','pos') → upper left
+#   ('pos','neg') → lower right
+#   ('neg','neg') → lower left
+#
+# This approach ensures that the vector field and trajectory
+# initialization reflect the actual Q-value dynamics for
+# the selected strategy pair and state, making the plotting
+# fully automatic and robust.
+# --------------------------------------------------------
+
 def QvaluesADvsAD(t, r, p, s, epsilon, d):
     denom = 2 * (d - 1)  # equivalent to 2*(-1 + d)
     

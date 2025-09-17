@@ -3,7 +3,45 @@ import time
 import sys
 sys.path.append('../')
 from utils import *
+from basin import *
+func_map = {
+    "AD": QvaluesADvsAD,
+    "GT": QvaluesGTvsGT,
+    "AGT": QvaluesADvsAGT,
+    "AC": QvaluesADvsAC
+}
 
+def enforce_q_sign_for_state(q, desired_sign, state_idx):
+    """
+    Enforce ΔQ sign (defect - coop) in one state by swapping
+    the two action entries in that column if necessary.
+    q has shape (2,2) with q[action, state].
+    """
+    cur = q[1, state_idx] - q[0, state_idx]
+    if desired_sign == "pos" and cur < 0:
+        q[0, state_idx], q[1, state_idx] = q[1, state_idx], q[0, state_idx]
+    elif desired_sign == "neg" and cur > 0:
+        q[0, state_idx], q[1, state_idx] = q[1, state_idx], q[0, state_idx]
+    return q
+
+
+def get_signs(s1, s2, t, r, p, s, epsilon, delta, state_idx):
+    """
+    Calcola i segni teorici (ΔQ = defect - coop) per player1 (x) e player2 (y)
+    nello stato state_idx, usando le funzioni Qvalues.
+    """
+    func1 = func_map[s2]  # player1 reagisce a strategy2
+    func2 = func_map[s1]  # player2 reagisce a strategy1
+
+    Qx = func1(t, r, p, s, epsilon, delta)[state_idx]  # [defect, coop]
+    Qy = func2(t, r, p, s, epsilon, delta)[state_idx]
+
+    dx = Qx[0] - Qx[1]
+    dy = Qy[0] - Qy[1]
+    x_sign = "pos" if dx >= 0 else "neg"
+    y_sign = "pos" if dy >= 0 else "neg"
+    return x_sign, y_sign
+    
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
     def __init__(self, DC=1, CC=0.8, DD=0.2, CD=0):
@@ -24,10 +62,44 @@ class StateTransition:
 
 strategies = ["AD", "GT", "AGT", "AC"]
 
-def generate_q_for_strategy(strategy, delta, T=1.0):
+def get_signs(s1, s2, t, r, p, s, epsilon, delta, state_idx):
+    """
+    Calcola i segni di ΔQ (defect - coop) per entrambi i giocatori
+    nello stato `state_idx` (0 = StateC, 1 = StateD).
+
+    """
+    func1 = func_map[s2]  # x-component uses opponent strategy s2
+    func2 = func_map[s1] 
+
+    Qx = func1(t, r, p, s, epsilon, delta)[state_idx]  # valori per player x
+    Qy = func2(t, r, p, s, epsilon, delta)[state_idx]  # valori per player y
+    
+    dx = Qx[0] - Qx[1]  # defect − coop
+    dy = Qy[0] - Qy[1]
+
+    x_sign = 'pos' if dx >= 0 else 'neg'
+    y_sign = 'pos' if dy >= 0 else 'neg'
+    return x_sign, y_sign
+
+
+def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
     """
     Generate a 2x2 Q-matrix that satisfies the inequalities
-    corresponding to a given strategy.
+    corresponding to a given strategy, and optionally enforce
+    ΔQ signs for x and y so that trajectories start in the
+    correct quadrant.
+    
+    Parameters
+    ----------
+    strategy : str
+        One of {"AD","GT","AGT","AC"}.
+    delta : float
+        Discount factor.
+    T : float
+        Scaling parameter (default 1.0).
+    x_sign, y_sign : {"pos","neg",None}
+        Desired signs of ΔQ = (defect − coop) for x (columns) and y (rows).
+        If None, no correction is applied.
     """
     upper_limit = T / (1 - delta)
     
@@ -35,8 +107,6 @@ def generate_q_for_strategy(strategy, delta, T=1.0):
     Q = np.random.uniform(0, upper_limit, (2, 2))
 
     # Enforce inequalities depending on strategy
-    #(GT, AGT): top left, bottom right [to check]
-    #adapt based on the change of func1[s2] and func2[s1]
     if strategy == "AD":   # Q1 < Q3 and Q2 < Q4
         if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
@@ -45,17 +115,16 @@ def generate_q_for_strategy(strategy, delta, T=1.0):
         if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
 
-    elif strategy == "AGT": # Q1  Q3 and Q2 > Q4
-        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
+    elif strategy == "AGT": # Q1 > Q3 and Q2 > Q4
+        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
         if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
 
     elif strategy == "AC":  # Q1 < Q3 and Q2 > Q4
-        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
+        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
 
+
     return Q
-
-
 
 
 class Algorithm:
@@ -84,6 +153,7 @@ class Algorithm:
 
         self.eqC = np.zeros((1, M))
         self.eqD = np.zeros((1, M))
+
 
     def initialize_q_values(self):
         """
@@ -118,13 +188,24 @@ class Algorithm:
             if not isinstance(self.strategy1, str) or not isinstance(self.strategy2, str):
                 raise TypeError("strategy1 and strategy2 must be strings, e.g., 'AD', 'GT'")
 
-            # Use exactly the specified strategies
-            s1 = self.strategy1
-            s2 = self.strategy2
+            
 
-            # Generate Q-matrices consistent with that pair
-            q1 = generate_q_for_strategy(s1, self.delta)
-            q2 = generate_q_for_strategy(s2, self.delta)
+
+            # generate candidate q1,q2
+            q1 = generate_q_for_strategy(self.strategy1, self.delta)
+            q2 = generate_q_for_strategy(self.strategy2, self.delta)
+
+            # enforce ΔQ signs for both states
+            for state_idx in (0, 1):
+                # segni desiderati dal modello teorico
+                x_sign, y_sign = get_signs(
+                    self.strategy1, self.strategy2, 1, 0.8, 0.2, 0, self.e, self.delta, state_idx
+                )
+
+                # correzione su q1 (player1, asse x)
+                q1 = enforce_q_sign_for_state(q1, x_sign, state_idx)
+                # correzione su q2 (player2, asse y)
+                q2 = enforce_q_sign_for_state(q2, y_sign, state_idx)
 
         else:
             raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")

@@ -139,117 +139,64 @@ class VectorFieldAutomatic:
 
     def get_quadrant_bounds(self, strategy1, strategy2, state_idx):
         """
-        Determine the quadrant bounds based on the Q-value functions being used.
-        
-        The logic is based on the equilibrium points of the Q-value functions:
-        - QvaluesADvsAD: equilibrium at (+, +)
-        - QvaluesGTvsGT: equilibrium at (-, +) for StateC, (+, +) for StateD
-        - QvaluesADvsAGT: equilibrium varies by state
-        - QvaluesADvsAC: equilibrium varies by state
-        
-        The quadrant is determined by where the vector field equilibrium lies,
-        which depends on the Q-value difference functions being used.
-        
-        Args:
-            strategy1: Player 1 strategy (determines func2 - y-component function)
-            strategy2: Player 2 strategy (determines func1 - x-component function) 
-            state_idx: 0 for StateC, 1 for StateD
-            
-        Returns:
-            (xmin, xmax, ymin, ymax) for the selected quadrant
+        Determina il quadrante valutando i segni delle differenze di Q
+        per x (player1) e y (player2) nello stato `state_idx`.
+        Ritorna (xmin, xmax, ymin, ymax).
         """
         bound = self.bound
-        
-        # Define quadrant bounds: (xmin, xmax, ymin, ymax)
         quadrants = {
-            'pos_pos': (0, bound, 0, bound),      # (+, +) upper right
-            'neg_pos': (-bound, 0, 0, bound),     # (-, +) upper left
-            'pos_neg': (0, bound, -bound, 0),     # (+, -) lower right
-            'neg_neg': (-bound, 0, -bound, 0)     # (-, -) lower left
+            ('pos', 'pos'): (0, bound, 0, bound),      # upper-right
+            ('neg', 'pos'): (-bound, 0, 0, bound),     # upper-left
+            ('pos', 'neg'): (0, bound, -bound, 0),     # lower-right
+            ('neg', 'neg'): (-bound, 0, -bound, 0)     # lower-left
         }
-        
-        # Get the actual equilibrium points by evaluating the Q-value functions
-        # This is more accurate than using strategy labels
+
+        tol = 1e-10  # tolleranza per evitare casi numerici ambigui
+
+        # Se ho le due funzioni, uso i valori numerici (metodo robusto)
         if self.func1 is not None and self.func2 is not None:
             try:
-                Q1 = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
-                Q2 = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
-                
-                # Calculate equilibrium points (where dQ = 0)
-                equilibrium_x = Q1[0] - Q1[1]  # x-axis equilibrium
-                equilibrium_y = Q2[0] - Q2[1]  # y-axis equilibrium
-                
-                # Determine quadrant based on equilibrium signs
-                x_sign = 'pos' if equilibrium_x >= 0 else 'neg'
-                y_sign = 'pos' if equilibrium_y >= 0 else 'neg'
-                
-                quad_key = f"{x_sign}_{y_sign}"
-                return quadrants[quad_key]
-                
+                # Nota: func1 -> produce Q per l'asse x (difetto-coop per player1),
+                #       func2 -> produce Q per l'asse y (difetto-coop per player2).
+                Qx = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
+                Qy = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
+
+                dx = Qx[0] - Qx[1]   # definizione tua: (defect - cooperate)
+                dy = Qy[0] - Qy[1]
+
+                x_sign = 'pos' if dx > tol else ('neg' if dx < -tol else 'pos')  # tie -> pos
+                y_sign = 'pos' if dy > tol else ('neg' if dy < -tol else 'pos')
+
+                return quadrants[(x_sign, y_sign)]
             except Exception as e:
-                print(f"Warning: Could not compute equilibrium for {strategy1} vs {strategy2}, using fallback logic")
-        
-        # Fallback logic based on known function behaviors
-        # This is derived from your Mathematica examples and game theory
-        
-        # Function-based quadrant mapping (more accurate than strategy-based)
-        func_equilibrium_map = {
-            # Based on your Mathematica code patterns
-            ('AD', 'AD'): ('pos', 'pos'),  # QvaluesADvsAD -> always (+, +)
-            ('GT', 'GT'): ('neg', 'pos') if state_idx == 0 else ('pos', 'pos'),  # QvaluesGTvsGT
-            ('AD', 'AGT'): ('pos', 'neg') if state_idx == 0 else ('pos', 'pos'),  # QvaluesADvsAGT  
-            ('AD', 'AC'): ('pos', 'pos'),  # QvaluesADvsAC
-            
-            # Symmetric cases (when roles are swapped)
-            ('AGT', 'AD'): ('neg', 'pos') if state_idx == 0 else ('pos', 'pos'),
-            ('AC', 'AD'): ('pos', 'pos'),
-            
-            # AGT and AC combinations (educated guesses based on game theory)
-            ('AGT', 'AGT'): ('pos', 'neg'),  # Both anti-generous
-            ('AC', 'AC'): ('neg', 'neg'),    # Both always cooperate
-            ('AGT', 'AC'): ('neg', 'neg') if state_idx == 0 else ('pos', 'neg'),
-            ('AC', 'AGT'): ('pos', 'neg') if state_idx == 0 else ('neg', 'pos'),
-            
-            # GT mixed with AGT and AC
-            ('GT', 'AGT'): ('pos', 'pos') if state_idx == 0 else ('neg', 'pos'),
-            ('AGT', 'GT'): ('neg', 'pos') if state_idx == 0 else ('pos', 'neg'),
-            ('GT', 'AC'): ('neg', 'pos'),
-            ('AC', 'GT'): ('neg', 'neg') if state_idx == 0 else ('neg', 'pos'),
-            
-            # AD mixed with GT (from your Mathematica examples)
-            ('AD', 'GT'): ('neg', 'pos'),
-            ('GT', 'AD'): ('pos', 'pos'),
+                # fallback se qualcosa fallisce nel calcolo numerico
+                print(f"Warning computing equilibrium numerically: {e}. Using fallback mapping.")
+
+        # Se non ho le funzioni (o il calcolo è fallito), uso una semplice regola basata
+        # sulle etichette delle strategie (meno preferibile ma come fallback)
+        strategy_to_sign = {
+            "AD": ('pos', 'pos'),
+            "GT": ('neg', 'pos'),
+            "AGT": ('pos', 'neg'),
+            "AC": ('neg', 'neg')
         }
-        
-        # Look up the equilibrium for this strategy pair and state
-        key = (strategy2, strategy1)  # Note: strategy2 affects x, strategy1 affects y
-        if key in func_equilibrium_map:
-            x_sign, y_sign = func_equilibrium_map[key]
-        else:
-            # Ultimate fallback: use individual strategy tendencies
-            strategy_x_sign = {
-                "AD": 'pos', "GT": 'neg', "AGT": 'pos', "AC": 'neg'
-            }
-            strategy_y_sign = {
-                "AD": 'pos', "GT": 'pos', "AGT": 'neg', "AC": 'neg'  
-            }
-            x_sign = strategy_x_sign.get(strategy2, 'pos')
-            y_sign = strategy_y_sign.get(strategy1, 'pos')
-        
-        quad_key = f"{x_sign}_{y_sign}"
-        return quadrants[quad_key]
+
+        sx = strategy_to_sign.get(strategy1, ('pos','pos'))[0]  # prima componente per x
+        sy = strategy_to_sign.get(strategy2, ('pos','pos'))[1]  # seconda componente per y
+
+        return quadrants[(sx, sy)]
 
     def prepare_states(self):
         """Calcola StateC e StateD per le traiettorie."""
-        self.q1['StateC'] = self.q1['Q3'] - self.q1['Q1']
-        self.q1['StateD'] = self.q1['Q4'] - self.q1['Q2']
-        self.q2['StateC'] = self.q2['Q3'] - self.q2['Q1']
-        self.q2['StateD'] = self.q2['Q4'] - self.q2['Q2']
+        self.q1['StateBC'] = self.q1['Q3'] - self.q1['Q1']
+        self.q1['StateA1D'] = self.q1['Q4'] - self.q1['Q2']
+        self.q2['StateBC'] = self.q2['Q3'] - self.q2['Q1']
+        self.q2['StateA1D'] = self.q2['Q4'] - self.q2['Q2']
 
-        self.xC, self.yC = self.q1['StateC'].values, self.q2['StateC'].values
+        self.xC, self.yC = self.q1['StateBC'].values, self.q2['StateBC'].values
         self.uC, self.vC = self.xC[1:] - self.xC[:-1], self.yC[1:] - self.yC[:-1]
 
-        self.xD, self.yD = self.q1['StateD'].values, self.q2['StateD'].values
+        self.xD, self.yD = self.q1['StateA1D'].values, self.q2['StateA1D'].values
         self.uD, self.vD = self.xD[1:] - self.xD[:-1], self.yD[1:] - self.yD[:-1]
 
     def compute_boa(self, idx):

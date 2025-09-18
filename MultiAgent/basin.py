@@ -33,47 +33,7 @@ from matplotlib import cm
 
 # Q value difference is: (defect action - cooperate action)
 
-# --------------------------------------------------------
-# How the automatic quadrant determination for strategy pairs works:
-#
-# The single-agent strategy-to-quadrant mapping:
-#   AD  → (+,+)
-#   GT  → (-,+)
-#   AGT → (+,-)
-#   AC  → (-,-)
-# describes the typical ΔQ signs for an individual agent.
-#
-# However, for strategy pairs (s1, s2), this static mapping is 
-# insufficient:
-#   - Example: (AD, AD) → both agents in (+,+) quadrant, fine.
-#   - Example: (GT, AD) → agent 1's ΔQ might suggest (-,+) and 
-#                         agent 2's ΔQ suggests (+,+). Which quadrant 
-#                         to show? Only computing the actual ΔQ values 
-#                         can resolve this.
-#
-# To handle any strategy pair robustly:
-# 1. Compute ΔQ for both agents:
-#       dx = Qx[0] - Qx[1]  # x-axis (agent 1 or "player")
-#       dy = Qy[0] - Qy[1]  # y-axis (agent 2 or "opponent")
-#
-# 2. Determine signs from these computed values:
-#       x_sign = 'pos' if dx >= 0 else 'neg'
-#       y_sign = 'pos' if dy >= 0 else 'neg'
-#
-# 3. Map the signs to a quadrant:
-#       ('pos','pos') → upper right
-#       ('neg','pos') → upper left
-#       ('pos','neg') → lower right
-#       ('neg','neg') → lower left
-#
-# 4. Use this quadrant for both plotting the vector field 
-#    and initializing trajectories, ensuring consistency with 
-#    the actual dynamics for that strategy pair.
-#
-# This approach generalizes beyond single-agent expectations, 
-# making the visualization automatic and valid for any combination 
-# of strategies.
-# --------------------------------------------------------
+
 
 
 def QvaluesADvsAD(t, r, p, s, epsilon, d):
@@ -144,6 +104,7 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
                      [first_term, second_term]])
 
 #TODO: BC (Both Cooperated) and A1D (At least 1 defected)
+#TODO: reduce lenght of arrows when we approach the equilibrium point
 
 class VectorFieldAutomatic:
     """
@@ -181,11 +142,37 @@ class VectorFieldAutomatic:
                 raise ValueError("q1 and q2 must be provided if show_trajectory is True.")
             self.prepare_states()
 
+    
     def get_quadrant_bounds(self, strategy1, strategy2, state_idx):
         """
-        Determina il quadrante valutando i segni delle differenze di Q
-        per x (player1) e y (player2) nello stato `state_idx`.
-        Ritorna (xmin, xmax, ymin, ymax).
+        Determine the quadrant for plotting based on the strategies of agent1 (x-axis)
+        and agent2 (y-axis).
+
+        Strategy mapping encodes two signs:
+            AD   → (+, +)   # C positive, D positive
+            GT   → (-, +)   # C negative, D positive
+            AGT  → (+, -)   # C positive, D negative
+            AC   → (-, -)   # C negative, D negative
+
+        Interpretation:
+        - The first component corresponds to State C.
+        - The second component corresponds to State D.
+
+        Rule for quadrant selection:
+        - For State C (state_idx = 0):
+            * Take agent1's first sign (C) → x-axis
+            * Take agent2's first sign (C) → y-axis
+            → quadrant = (x_sign, y_sign)
+
+        - For State D (state_idx = 1):
+            * Take agent1's second sign (D) → x-axis
+            * Take agent2's second sign (D) → y-axis
+            → quadrant = (x_sign, y_sign)
+
+        Example:
+            agent1 = AD (+,+), agent2 = GT (-,+)
+            - State C (idx=0): quadrant = (+, -) → lower-right
+            - State D (idx=1): quadrant = (+, +) → upper-right
         """
         bound = self.bound
         quadrants = {
@@ -195,41 +182,42 @@ class VectorFieldAutomatic:
             ('neg', 'neg'): (-bound, 0, -bound, 0)     # lower-left
         }
 
-        tol = 1e-10  # tolleranza per evitare casi numerici ambigui
+        tol = 1e-10
 
-        # Se ho le due funzioni, uso i valori numerici (metodo robusto)
+        # Provo calcolo numerico se le funzioni sono definite
         if self.func1 is not None and self.func2 is not None:
             try:
-                # Nota: func1 -> produce Q per l'asse x (difetto-coop per player1),
-                #       func2 -> produce Q per l'asse y (difetto-coop per player2).
                 Qx = self.func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
                 Qy = self.func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[state_idx]
 
-                dx = Qx[0] - Qx[1]   # definizione tua: (defect - cooperate)
+                dx = Qx[0] - Qx[1]
                 dy = Qy[0] - Qy[1]
 
-                x_sign = 'pos' if dx > tol else ('neg' if dx < -tol else 'pos')  # tie -> pos
+                x_sign = 'pos' if dx > tol else ('neg' if dx < -tol else 'pos')
                 y_sign = 'pos' if dy > tol else ('neg' if dy < -tol else 'pos')
 
                 return quadrants[(x_sign, y_sign)]
             except Exception as e:
-                # fallback se qualcosa fallisce nel calcolo numerico
                 print(f"Warning computing equilibrium numerically: {e}. Using fallback mapping.")
 
-        # Se non ho le funzioni (o il calcolo è fallito), uso una semplice regola basata
-        # sulle etichette delle strategie (meno preferibile ma come fallback)
-        strategy_to_sign = {
+        # Fallback mapping strategie → (signC, signD)
+        strategy_to_signs = {
             "AD": ('pos', 'pos'),
             "GT": ('neg', 'pos'),
             "AGT": ('pos', 'neg'),
             "AC": ('neg', 'neg')
         }
 
-        sx = strategy_to_sign.get(strategy1, ('pos','pos'))[0]  # prima componente per x
-        sy = strategy_to_sign.get(strategy2, ('pos','pos'))[1]  # seconda componente per y
+        s1 = strategy_to_signs.get(strategy1, ('pos', 'pos'))
+        s2 = strategy_to_signs.get(strategy2, ('pos', 'pos'))
+
+        # Entrambi prendono il segno relativo allo stesso state_idx
+        sx = s1[state_idx]  # agent1 → x
+        sy = s2[state_idx]  # agent2 → y
 
         return quadrants[(sx, sy)]
 
+    
     def prepare_states(self):
         """Calcola StateC e StateD per le traiettorie."""
         self.q1['StateBC'] = self.q1['Q3'] - self.q1['Q1']
@@ -285,8 +273,8 @@ class VectorFieldAutomatic:
         fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
         subplots = [
-            ('StateC', 0),  # first array
-            ('StateD', 1)   # second array
+            ('StateBC', 0),  # first array
+            ('StateA1D', 1)   # second array
         ]
 
         for i, (state_name, idx) in enumerate(subplots):
@@ -306,7 +294,7 @@ class VectorFieldAutomatic:
                 y = getattr(self, f'y{state_name[-1]}')
                 u = getattr(self, f'u{state_name[-1]}')
                 v = getattr(self, f'v{state_name[-1]}')
-                color = 'blue' if state_name == 'StateC' else 'orange'
+                color = 'blue' if state_name == 'StateBC' else 'orange'
                 ax.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1,
                         color=color, alpha=0.8, width=0.004, label=f'Trajectory {state_name}')
                 ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)

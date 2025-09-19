@@ -143,7 +143,7 @@ class VectorFieldAutomatic:
             self.prepare_states()
 
     
-    def get_quadrant_bounds(self, strategy1, strategy2, state_idx):
+    def get_quadrant_bounds_target(self, strategy1, strategy2, state_idx):
         """
         Determine the quadrant for plotting based on the strategies of agent1 (x-axis)
         and agent2 (y-axis).
@@ -218,6 +218,38 @@ class VectorFieldAutomatic:
         return quadrants[(sx, sy)]
 
     
+    def get_quadrant_bounds_case(self, strategy1, strategy2, state_idx):
+        """
+        select the quadrant
+        """
+        bound = self.bound
+        quadrants = {
+            ('pos', 'pos'): (0, bound, 0, bound),      # upper-right
+            ('neg', 'pos'): (-bound, 0, 0, bound),     # upper-left
+            ('pos', 'neg'): (0, bound, -bound, 0),     # lower-right
+            ('neg', 'neg'): (-bound, 0, -bound, 0)     # lower-left
+        }
+
+        
+
+        # Fallback mapping strategie → (signC, signD)
+        strategy_to_signs = {
+            "AD": ('pos', 'pos'),
+            "GT": ('neg', 'pos'),
+            "AGT": ('pos', 'neg'),
+            "AC": ('neg', 'neg')
+        }
+
+        s1 = strategy_to_signs.get(strategy1)
+        s2 = strategy_to_signs.get(strategy2)
+
+        
+        sx = s1[state_idx]  # agent1 → x
+        sy = s2[state_idx]  # agent2 → y
+
+        return quadrants[(sx, sy)]
+
+
     def prepare_states(self):
         """Calcola StateC e StateD per le traiettorie."""
         self.q1['StateBC'] = self.q1['Q3'] - self.q1['Q1']
@@ -248,7 +280,7 @@ class VectorFieldAutomatic:
         boa_y = np.array([0, -scale * dy])
         return boa_x, boa_y
 
-    def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func1, func2, idx):
+    def add_vector_field_old(self, ax, xmin, xmax, ymin, ymax, func1, func2, idx):
         """Add vector field to the specified region."""
         X_vals = np.linspace(xmin, xmax, self.density)
         Y_vals = np.linspace(ymin, ymax, self.density)
@@ -267,26 +299,67 @@ class VectorFieldAutomatic:
         mag = np.sqrt(U**2 + V**2) + 1e-8
         ax.quiver(X, Y, U/mag, V/mag, angles='xy', scale_units='xy', scale=12,
                 color='black', alpha=0.7, width=0.003)
+        
+    def add_vector_field(self, ax, xmin, xmax, ymin, ymax, func1, func2, idx):
+        X_vals = np.linspace(xmin, xmax, self.density)
+        Y_vals = np.linspace(ymin, ymax, self.density)
+        X, Y = np.meshgrid(X_vals, Y_vals)
+        
+        # Compute ΔQ
+        Q1 = func1(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
+        Q2 = func2(self.t, self.r, self.p, self.s, self.epsilon, self.delta)[idx]
+        dQx = Q1[0] - Q1[1]
+        dQy = Q2[0] - Q2[1]
 
-    def plot(self):
-        """Plot two subplots with quadrant-specific vector fields."""
+        U = self.alpha * (dQx - X)
+        V = self.alpha * (dQy - Y)
+
+        # Compute magnitude
+        M = np.sqrt(U**2 + V**2)
+
+        # --- Scale arrows to shrink near equilibrium ---
+        # Instead of normalizing, compress magnitudes smoothly
+        scale_factor = np.sqrt(M) / (1 + np.sqrt(M))  
+        U = U / (M + 1e-8) * scale_factor/3
+        V = V / (M + 1e-8) * scale_factor/3
+
+        # Plot vector field
+        ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1,
+                color='black', alpha=0.7, width=0.003)
+
+
+    def plot(self, show_all_quadrants=False):
+        """Plot two subplots with either quadrant-specific or full-plane vector fields."""
         fig, axes = plt.subplots(1, 2, figsize=(12, 6))
 
         subplots = [
-            ('StateBC', 0),  # first array
-            ('StateA1D', 1)   # second array
+            ('StateBC', 0),   # state index 0
+            ('StateA1D', 1)   # state index 1
         ]
 
         for i, (state_name, idx) in enumerate(subplots):
             ax = axes[i]
 
-            # Get the appropriate quadrant for this strategy pair and state
-            xmin, xmax, ymin, ymax = self.get_quadrant_bounds(
-                self.strategy1, self.strategy2, idx
-            )
-            
-            # Add vector field only to the selected quadrant
-            self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
+            if show_all_quadrants:
+                # Quadrants
+                bound = self.bound
+                quadrants = [
+                    (0, bound, -bound, 0),
+                    (-bound, 0, -bound, 0),
+                    (0, bound, 0, bound),
+                    (-bound, 0, 0, bound)
+                ]
+                for xmin, xmax, ymin, ymax in quadrants:
+                    # Use both func1 and func2 for each subplot with correct idx
+                    self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
+            else:
+                # Restrict to the quadrant selected by strategies
+                xmin, xmax, ymin, ymax = self.get_quadrant_bounds_case(
+                    self.strategy1, self.strategy2, idx
+                )
+
+                # Add vector field
+                self.add_vector_field(ax, xmin, xmax, ymin, ymax, self.func1, self.func2, idx)
 
             # Trajectory
             if self.show_trajectory:
@@ -295,20 +368,31 @@ class VectorFieldAutomatic:
                 u = getattr(self, f'u{state_name[-1]}')
                 v = getattr(self, f'v{state_name[-1]}')
                 color = 'blue' if state_name == 'StateBC' else 'orange'
-                ax.quiver(x[:-1], y[:-1], u, v, angles='xy', scale_units='xy', scale=1,
-                        color=color, alpha=0.8, width=0.004, label=f'Trajectory {state_name}')
+                ax.quiver(
+                    x[:-1], y[:-1], u, v,
+                    angles='xy', scale_units='xy', scale=1,
+                    color=color, alpha=0.8, width=0.004,
+                    label=f'Trajectory {state_name}'
+                )
+                
                 ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
 
-            # BoA
+            # Basin of attraction
             if self.show_basin:
                 boa_x, boa_y = self.compute_boa(idx)
                 if boa_x is not None and boa_y is not None:
                     ax.plot(boa_x, boa_y, color='red', linewidth=2, label='BoA Boundary')
 
-            # Set plot limits to the selected quadrant
-            ax.set_xlim(xmin, xmax)
-            ax.set_ylim(ymin, ymax)
-            
+            if show_all_quadrants:
+                bound = self.bound
+                ax.set_xlim(-bound, bound)
+                ax.set_ylim(-bound, bound)
+            else:
+                ax.set_xlim(xmin, xmax)
+                ax.set_ylim(ymin, ymax)
+
+
+            # Styling
             ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
             ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
             ax.set_aspect('equal')

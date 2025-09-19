@@ -55,8 +55,8 @@ from basin import *
 #  P1 → cooperate   |         both → defect
 #  P2 → defect      |
 #                   |
-# ------------------+------------------→ ΔQ_x > 0
-#                   |        (player1 prefers defect)
+# ------------------+------------------→ ΔQ_x > 0 (player1 prefers defect)
+#                   |                            
 #                   |
 #  QIII             |            QIV
 # (x<0, y<0)        |        (x>0, y<0)
@@ -175,22 +175,26 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
     
     # Start with random values
     Q = np.random.uniform(0, upper_limit, (2, 2))
+    # Q = [ [Q00, Q01],[Q10, Q11] ]
+    # Qij = Q[action i, state j]
 
     # Enforce inequalities depending on strategy
-    if strategy == "AD":   # Q1 < Q3 and Q2 < Q4
+    #Q00 (cooperate) and Q10 (defect) is state BC
+    #Q01 (cooperate) and Q11 (defect) is state A1D
+    if strategy == "AD":   # Q00 < Q10 and Q01 < Q11
         if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
 
-    elif strategy == "GT": # Q1 > Q3 and Q2 < Q4
+    elif strategy == "GT": # Q00 > Q10 and Q01 < Q11
         if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
         if not (Q[0,1] < Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]])
 
-    elif strategy == "AGT": # Q1 > Q3 and Q2 > Q4
-        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
+    elif strategy == "AGT": # Q00 > Q10 and Q01 < Q11
+        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
         if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
 
-    elif strategy == "AC":  # Q1 < Q3 and Q2 > Q4
-        if not (Q[0,0] < Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]])
+    elif strategy == "AC":  # Q00 > Q10 and Q01 > Q11
+        if not (Q[0,0] > Q[1,0]): Q[0,0], Q[1,0] = sorted([Q[0,0], Q[1,0]], reverse=True)
         if not (Q[0,1] > Q[1,1]): Q[0,1], Q[1,1] = sorted([Q[0,1], Q[1,1]], reverse=True)
 
 
@@ -266,16 +270,16 @@ class Algorithm:
             q2 = generate_q_for_strategy(self.strategy2, self.delta)
 
             # enforce ΔQ signs for both states
-            for state_idx in (0, 1):
+            #for state_idx in (0, 1):
                 # segni desiderati dal modello teorico
-                x_sign, y_sign = get_signs(
-                    self.strategy1, self.strategy2, 1, 0.8, 0.2, 0, self.e, self.delta, state_idx
-                )
+            #    x_sign, y_sign = get_signs(
+            #        self.strategy1, self.strategy2, 1, 0.8, 0.2, 0, self.e, self.delta, state_idx
+            #    )
 
                 # correzione su q1 (player1, asse x)
-                q1 = enforce_q_sign_for_state(q1, x_sign, state_idx)
+            #    q1 = enforce_q_sign_for_state(q1, x_sign, state_idx)
                 # correzione su q2 (player2, asse y)
-                q2 = enforce_q_sign_for_state(q2, y_sign, state_idx)
+            #    q2 = enforce_q_sign_for_state(q2, y_sign, state_idx)
 
         else:
             raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")

@@ -200,6 +200,10 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
 
     return Q
 
+#TODO: create function here that is checking if the ordering remains the same till a certain point and in case plot till that point, based on the above funcion,
+# flag to plot the entire history no matter the ordering, or just till the ordering is the same, useful for vector fields
+#  
+
 
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""

@@ -4,76 +4,7 @@ import sys
 sys.path.append('../')
 from utils import *
 from basin import *
-# ============================================================
-# What changed compared to the previous version?
-#
-# Original implementation (generate_q_for_strategy):
-# - Initialized Q-values randomly.
-# - Enforced inequalities for the chosen strategy
-#   (e.g., AD: Q1 < Q3 and Q2 < Q4).
-# - This ensured the Q-matrix matched the *strategic definition*,
-#   BUT it did NOT ensure that ΔQ = (Q_defect − Q_coop) signs
-#   matched the expected vector field quadrants.
-# - Result: trajectories sometimes started in the wrong quadrant.
-#
-# New implementation (added steps):
-# 1. get_signs(...)
-#    - Computes the expected signs (x_sign, y_sign) of ΔQ
-#      for each state directly from the theoretical model.
-#
-# 2. enforce_q_sign_for_state(...)
-#    - Checks the actual ΔQ sign from the initialized Q-matrix.
-#    - If inconsistent with the expected sign, swaps the entries
-#      so the sign matches.
-#    - Guarantees player incentives (defect vs cooperate)
-#      are aligned with the vector fields.
-#
-# 3. initialize_q_values(...) updated:
-#    - Before: only generated Q with inequalities.
-#    - Now:
-#        (a) generate Q with inequalities,
-#        (b) compute expected signs via get_signs,
-#        (c) enforce them with enforce_q_sign_for_state,
-#        (d) store the corrected Q as the initial state.
-#
-# Logic of the change:
-# - Before: only strategy inequalities were enforced.
-# - After: BOTH strategy inequalities AND correct ΔQ signs
-#   are enforced → initial trajectories always start in the
-#   same quadrant as shown in the vector field plots.
-# ============================================================
-# ============================================================
-# explanation about the FIXED INITIALIZATION: enforce_q_sign_for_state
-# ============================================================
-# Quadrants of ΔQ (defect − coop) in the plane (x=player1, y=player2)
-#
-#          ΔQ_y > 0  (player2 prefers defect)
-#                   ↑
-#                   |
-#   QII             |            QI
-# (x<0, y>0)        |        (x>0, y>0)
-#  P1 → cooperate   |         both → defect
-#  P2 → defect      |
-#                   |
-# ------------------+------------------→ ΔQ_x > 0 (player1 prefers defect)
-#                   |                            
-#                   |
-#  QIII             |            QIV
-# (x<0, y<0)        |        (x>0, y<0)
-# both → cooperate  |   P1 → defect
-#                   |   P2 → cooperate
-#
-# Interpretation:
-# - ΔQ_x > 0 → player1 prefers defect in the current state
-# - ΔQ_x < 0 → player1 prefers cooperate
-# - ΔQ_y > 0 → player2 prefers defect
-# - ΔQ_y < 0 → player2 prefers cooperate
-#
-# Usage:
-# - get_signs(...) → returns (x_sign, y_sign) expected from the model
-# - enforce_q_sign_for_state(...) → forces initial Q to match those signs
-#   → ensures trajectories start in the correct quadrant shown in the vector fields
-# ============================================================
+
 
 func_map = {
     "AD": QvaluesADvsAD,
@@ -95,23 +26,7 @@ def enforce_q_sign_for_state(q, desired_sign, state_idx):
     return q
 
 
-def get_signs(s1, s2, t, r, p, s, epsilon, delta, state_idx):
-    """
-    Calcola i segni teorici (ΔQ = defect - coop) per player1 (x) e player2 (y)
-    nello stato state_idx, usando le funzioni Qvalues.
-    """
-    func1 = func_map[s2]  # player1 reagisce a strategy2
-    func2 = func_map[s1]  # player2 reagisce a strategy1
 
-    Qx = func1(t, r, p, s, epsilon, delta)[state_idx]  # [defect, coop]
-    Qy = func2(t, r, p, s, epsilon, delta)[state_idx]
-
-    dx = Qx[0] - Qx[1]
-    dy = Qy[0] - Qy[1]
-    x_sign = "pos" if dx >= 0 else "neg"
-    y_sign = "pos" if dy >= 0 else "neg"
-    return x_sign, y_sign
-    
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
     def __init__(self, DC=1, CC=0.8, DD=0.2, CD=0):
@@ -132,24 +47,6 @@ class StateTransition:
 
 strategies = ["AD", "GT", "AGT", "AC"]
 
-def get_signs(s1, s2, t, r, p, s, epsilon, delta, state_idx):
-    """
-    Calcola i segni di ΔQ (defect - coop) per entrambi i giocatori
-    nello stato `state_idx` (0 = StateC, 1 = StateD).
-
-    """
-    func1 = func_map[s2]  # x-component uses opponent strategy s2
-    func2 = func_map[s1] 
-
-    Qx = func1(t, r, p, s, epsilon, delta)[state_idx]  # valori per player x
-    Qy = func2(t, r, p, s, epsilon, delta)[state_idx]  # valori per player y
-    
-    dx = Qx[0] - Qx[1]  # defect − coop
-    dy = Qy[0] - Qy[1]
-
-    x_sign = 'pos' if dx >= 0 else 'neg'
-    y_sign = 'pos' if dy >= 0 else 'neg'
-    return x_sign, y_sign
 
 
 def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
@@ -200,9 +97,6 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
 
     return Q
 
-#TODO: create function here that is checking if the ordering remains the same till a certain point and in case plot till that point, based on the above funcion,
-# flag to plot the entire history no matter the ordering, or just till the ordering is the same, useful for vector fields
-#  
 
 
 class Algorithm:
@@ -273,17 +167,8 @@ class Algorithm:
             q1 = generate_q_for_strategy(self.strategy1, self.delta)
             q2 = generate_q_for_strategy(self.strategy2, self.delta)
 
-            # enforce ΔQ signs for both states
-            #for state_idx in (0, 1):
-                # segni desiderati dal modello teorico
-            #    x_sign, y_sign = get_signs(
-            #        self.strategy1, self.strategy2, 1, 0.8, 0.2, 0, self.e, self.delta, state_idx
-            #    )
-
-                # correzione su q1 (player1, asse x)
-            #    q1 = enforce_q_sign_for_state(q1, x_sign, state_idx)
-                # correzione su q2 (player2, asse y)
-            #    q2 = enforce_q_sign_for_state(q2, y_sign, state_idx)
+        #elif self.init_mode == 'upload':
+            
 
         else:
             raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")

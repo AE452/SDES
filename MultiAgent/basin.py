@@ -374,8 +374,8 @@ class VectorFieldAutomatic:
                     color=color, alpha=0.8, width=0.004,
                     label=f'Trajectory {state_name}'
                 )
-                
-                ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
+                #this is a red cross (x) plot at the end of the trajectory, we decided to eliminate 
+                #ax.scatter(x[-1], y[-1], color='red', marker='X', s=50)
 
             # Basin of attraction
             if self.show_basin:

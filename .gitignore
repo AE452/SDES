@@ -7,5 +7,6 @@ __pycache__/
 *.csv
 *.pyc
 *.pdf
+*.tex
 *.DS_Store
 .DS_Store

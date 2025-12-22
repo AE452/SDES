@@ -120,7 +120,6 @@ def run_experiment_chunk(parameter_combinations_chunk):
 
     return results_chunk
 
-
 def save_results(results_chunk, file_path):
     """Save the chunk of results to a CSV file."""
     file_exists = os.path.exists(file_path)
@@ -176,7 +175,6 @@ def run_experiment(parameter_combinations, file_path="results_vect3.csv"):
             print(f"\rProgress: {progress:.2f}% ({completed + 1}/{total_chunks})", end='')
 
     print("\nProcessing complete.")
-
 
 # Define the chunk processing function at the top level
 def process_chunk(chunk):
@@ -300,6 +298,6 @@ if __name__ == "__main__":
     parameter_combinations = generate_combinations_parallel(M_rounded, alpha_values, lambda_values, epsilon_values, delta_values, random_uniform_values)
     
     # Run the experiment with the generated combinations
-    print(f"Generated {len(parameter_combinations[29126:])} combinations.")
-    run_experiment_a(parameter_combinations[29126:])
+    print(f"Generated {len(parameter_combinations)} combinations.")
+    run_experiment_a(parameter_combinations)
 

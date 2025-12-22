@@ -302,7 +302,35 @@ def create_line(value, length=10):
     """
     return [value for _ in range(length)]
 
+def heatmap_fixed_pairs(df, yaxis, xaxis, value, fixed_pairs):
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))  # Create a 2x2 grid for subplots
+    axes = axes.flatten()  # Flatten the array for easy indexing
 
+    for i, (alpha_val, lambda_val) in enumerate(fixed_pairs):
+        ax = axes[i]
+
+        # Filter data for the specific (alpha, lambda) pair
+        filtered_df = df[(df['alpha'] == alpha_val) & (df['lambda'] == lambda_val)]
+
+        if filtered_df.empty:
+            ax.set_title(f'No data for alpha={alpha_val}, lambda={lambda_val}')
+            ax.axis('off')  # Hide axes if no data
+            continue
+
+        # Create the heatmap
+        heatmap_data = filtered_df.pivot_table(index=yaxis, columns=xaxis, values=value, aggfunc='mean')
+        sns.heatmap(heatmap_data, cmap='YlGnBu', annot=False, fmt='.2f', 
+                    cbar_kws={'label': f'Mean {value}'}, ax=ax)
+
+        # Titles and labels
+        ax.set_title(f'alpha={alpha_val}, lambda={lambda_val}')
+        ax.set_xlabel(xaxis)
+        ax.set_ylabel(yaxis)
+        ax.invert_yaxis()
+
+    plt.tight_layout()
+    plt.show()
+    
 def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, show_legend, y_limits=None):
     """
     Plots multiple lines of P_AD against a specified variable on the x-axis, 

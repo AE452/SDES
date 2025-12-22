@@ -103,8 +103,6 @@ def QvaluesADvsAC(t, r, p, s, epsilon, d):
     return np.array([[first_term, second_term],
                      [first_term, second_term]])
 
-#TODO: BC (Both Cooperated) and A1D (At least 1 defected)
-#TODO: reduce lenght of arrows when we approach the equilibrium point
 
 class VectorFieldAutomatic:
     """

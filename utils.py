@@ -5,6 +5,223 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import seaborn as sns
 import matplotlib as mpl
+from matplotlib.colors import Normalize
+import plotly.graph_objects as go
+from matplotlib import colormaps
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import seaborn as sns
+import matplotlib as mpl
+
+# Use LaTeX for text rendering
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
+
+def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True):
+    """
+    Plots multiple subplots with a single shared legend.
+    """
+
+    # Mapping of variable names to Greek labels
+    greek_labels = {
+        "alpha": r"$\alpha$",
+        "beta": r"$\beta$",
+        "delta": r"$\delta$",
+        "lambda": r"$\lambda$",
+        "mu": r"$\mu$",
+        "M": r"$M$",
+        "P_GT": r"$P_{GT}$",
+        "P_AD": r"$P_{AD}$",
+    }
+
+    if y_var not in df.columns:
+        raise ValueError(f"The specified y-axis variable '{y_var}' is not in the dataframe.")
+
+    y_limits = (-0.1, 0.7) if use_same_scale else None
+    wspace, hspace = (0.02, 0.15) if use_same_scale else (0.2, 0.2)
+
+    fig, axes = plt.subplots(3, 3, figsize=(12, 8), 
+                             gridspec_kw={'wspace': wspace, 'hspace': hspace}, 
+                             constrained_layout=False)
+    axes = axes.flatten()
+    
+    handles, labels = None, None
+
+    for i, fixed_vars in enumerate(param_sets):
+        fixed_vars['M'] = m
+        handles, labels = plot_analysis_multiple_lines_sub(
+            df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits
+        )
+        # Set axis labels per subplot
+        # Only show x-label for bottom row
+        if i in [6, 7, 8]:
+            axes[i].set_xlabel(greek_labels.get(x_var, x_var))
+        else:
+            axes[i].set_xlabel("")
+            axes[i].set_xticklabels([])
+
+        axes[i].set_ylabel(greek_labels.get(y_var, y_var))
+
+    # Add a single legend outside the plot
+    if handles and labels:
+        fig.legend(handles, labels, title=greek_labels.get(varying_var, varying_var), 
+                   loc='upper right', bbox_to_anchor=(1.1, 1))
+
+    # Hide redundant labels for shared scales
+    if use_same_scale:
+        for ax in axes:
+            ax.label_outer()
+
+    plt.show()
+
+def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None):
+    """
+    Plots multiple lines in a single subplot without adding a legend.
+    """
+
+    greek_labels = {
+        "alpha": r"$\alpha$",
+        "beta": r"$\beta$",
+        "delta": r"$\delta$",
+        "epsilon": r"$\varepsilon$",
+        "e": r"$\varepsilon$",
+
+        "lambda": r"$\lambda$",
+        "mu": r"$\mu$",
+        "M": r"$M$",
+        "P_GT": r"$P_{GT}$",
+        "P_AD": r"$P_{AD}$",
+    }
+
+    if y_var not in df.columns:
+        raise ValueError(f"The dataframe must contain the column '{y_var}' for plotting.")
+
+    filtered_df = df.copy()
+    for var, value in fixed_vars.items():
+        filtered_df = filtered_df[filtered_df[var] == value]
+
+    if filtered_df.empty:
+        return None, None
+
+    unique_values = sorted(filtered_df[varying_var].unique())    
+    norm = plt.Normalize(min(unique_values), max(unique_values))
+    cmap = colormaps.get_cmap('viridis')
+
+    handles, labels = [], []
+
+    for value in unique_values:
+        subset = filtered_df[filtered_df[varying_var] == value]
+        if not subset.empty:
+            label = rf"{greek_labels.get(varying_var, varying_var)} = {value:.3f}"
+            line, = ax.plot(
+                subset[x_var], subset[y_var], marker='o',
+                label=label, color=cmap(norm(value))
+            )
+            handles.append(line)
+            labels.append(label)
+
+    # Format subplot title with Greek letters
+    title_parts = [
+        rf"{greek_labels.get(k, k)}={v}"
+        for k, v in fixed_vars.items() if k != 'M'
+    ]
+    ax.set_title(r"Fixed: " + ", ".join(title_parts))
+
+    ax.grid()
+
+    if y_limits:
+        ax.set_ylim(y_limits)
+
+    return handles, labels
+
+
+
+def interactive_3d_voxel(df, xaxis, yaxis, zaxis, value='P_AD', html=False):
+    greek_labels = {
+    "alpha": "α",
+    "beta": "β",
+    "delta": "δ",
+    "epsilon": "ε",
+    "e": "ε",
+    "lambda": "λ",
+    "mu": "μ",
+    "M": "M",  # Latin letter
+    "P_GT": "P_GT",  # Optional: use subscript formatting if needed
+    "P_AD": "P_AD",
+}
+
+
+    grouped = df.groupby([xaxis, yaxis, zaxis])[value].mean().reset_index()
+
+    # Map categorical to numeric
+    x_labels = sorted(df[xaxis].unique())
+    y_labels = sorted(df[yaxis].unique())
+    z_labels = sorted(df[zaxis].unique())
+
+    x_map = {k: i for i, k in enumerate(x_labels)}
+    y_map = {k: i for i, k in enumerate(y_labels)}
+    z_map = {k: i for i, k in enumerate(z_labels)}
+
+    # Map to numeric positions
+    grouped[str(xaxis)] = grouped[xaxis].map(x_map)
+    grouped[str(yaxis)] = grouped[yaxis].map(y_map)
+    grouped[str(zaxis)] = grouped[zaxis].map(z_map)
+
+    fig = go.Figure(data=go.Scatter3d(
+        x=grouped[str(xaxis)],
+        y=grouped[str(yaxis)],
+        z=grouped[str(zaxis)],
+        mode='markers',
+        marker=dict(
+            size=20,
+            color=grouped[value],
+            colorscale='Inferno',
+            colorbar=dict(title=greek_labels.get(value, value)),
+            opacity=0.8,
+        ),
+        text=[f'{value}: {v:.2f}' for v in grouped[value]]
+    ))
+
+    # ✅ Reduce tick labels (every 2nd for clarity)
+    x_ticks_sparse = x_labels[::2]
+    y_ticks_sparse = y_labels[::2]
+    z_ticks_sparse = z_labels[::2]
+
+    fig.update_layout(
+        width=1000,
+        height=800,
+        scene=dict(
+            xaxis=dict(
+                title=greek_labels.get(xaxis, xaxis),
+                tickvals=[x_map[v] for v in x_ticks_sparse],
+                ticktext=x_ticks_sparse
+            ),
+            yaxis=dict(
+                title=greek_labels.get(yaxis, yaxis),
+                tickvals=[y_map[v] for v in y_ticks_sparse],
+                ticktext=y_ticks_sparse
+            ),
+            zaxis=dict(
+                title=greek_labels.get(zaxis, zaxis),
+                tickvals=[z_map[v] for v in z_ticks_sparse],
+                ticktext=z_ticks_sparse
+            ),
+        ),
+        title=f"Interactive 3D Heatmap of {greek_labels.get(value, value)}<br>"
+              f"vs {greek_labels.get(xaxis, xaxis)}, {greek_labels.get(yaxis, yaxis)}, {greek_labels.get(zaxis, zaxis)}",
+        margin=dict(l=0, r=0, b=0, t=100)
+    )
+
+    if html:
+        fig.write_html("3dinteractivea.html", full_html=True, include_plotlyjs='cdn')
+    else: 
+        fig.show()
+
+
+
+
 def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     """
     Plots multiple lines of P_AD against a specified variable on the x-axis, 
@@ -41,7 +258,7 @@ def plot_analysis_multiple_lines(df, fixed_vars, x_var, varying_var):
     unique_values = sorted(filtered_df[varying_var].unique())    
     # Normalize unique values for colormap
     norm = plt.Normalize(min(unique_values), max(unique_values))
-    cmap = cm.get_cmap('viridis')
+    cmap = colormaps.get_cmap('viridis')
     
     # Plot each unique value as a separate line
     plt.figure(figsize=(15, 10))
@@ -93,7 +310,7 @@ def plot_analysis_average_and_vary(df, y_var, averaging_vars, x_var, varying_var
     # Get unique values of the varying variable
     unique_values = sorted(grouped[varying_var].unique())
     norm = plt.Normalize(min(unique_values), max(unique_values))
-    cmap = cm.get_cmap('viridis')
+    cmap = colormaps.get_cmap('viridis')
     # Plot each unique value as a separate line
     plt.figure(figsize=(15, 10))
     for value in unique_values:
@@ -330,7 +547,72 @@ def heatmap_fixed_pairs(df, yaxis, xaxis, value, fixed_pairs):
 
     plt.tight_layout()
     plt.show()
-    
+
+
+
+def heatmap_3d_voxels(df, xaxis, yaxis, zaxis, value='P_AD'):
+    # Compute mean value for each (x, y, z) triple
+    grouped = df.groupby([xaxis, yaxis, zaxis])[value].mean().reset_index()
+
+    # Map categories to integer indices
+    x_labels = sorted(df[xaxis].unique())
+    y_labels = sorted(df[yaxis].unique())
+    z_labels = sorted(df[zaxis].unique())
+
+    x_map = {k: i for i, k in enumerate(x_labels)}
+    y_map = {k: i for i, k in enumerate(y_labels)}
+    z_map = {k: i for i, k in enumerate(z_labels)}
+
+    # Prepare empty 3D grid
+    shape = (len(x_labels), len(y_labels), len(z_labels))
+    grid = np.full(shape, np.nan)
+
+    for _, row in grouped.iterrows():
+        xi = x_map[row[xaxis]]
+        yi = y_map[row[yaxis]]
+        zi = z_map[row[zaxis]]
+        grid[xi, yi, zi] = row[value]
+
+    # Create voxel mask
+    mask = ~np.isnan(grid)
+
+    # Normalize values for colormap
+    norm = Normalize(vmin=np.nanmin(grid), vmax=np.nanmax(grid))
+    cmap = colormaps.get_cmap('viridis')
+
+    # Build RGBA colors based on value
+    colors = np.zeros(grid.shape + (4,))
+    for idx, val in np.ndenumerate(grid):
+        if not np.isnan(val):
+            colors[idx] = cmap(norm(val))
+
+    # Plot voxels
+    fig = plt.figure(figsize=(20, 20))
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.voxels(mask, facecolors=colors, edgecolor='k')
+
+    ax.set_xticks(np.arange(len(x_labels)) + 0.5)
+    ax.set_xticklabels(x_labels, rotation=45, ha='right')
+    ax.set_yticks(np.arange(len(y_labels)) + 0.5)
+    ax.set_yticklabels(y_labels, rotation=45, ha='right')
+    ax.set_zticks(np.arange(len(z_labels)) + 0.5)
+    ax.set_zticklabels(z_labels)
+
+    ax.set_xlabel(xaxis)
+    ax.set_ylabel(yaxis)
+    ax.set_zlabel(zaxis)
+    ax.set_title(f'3D Voxel Heatmap of {value} by {xaxis}, {yaxis}, and {zaxis}')
+
+    # Colorbar
+    mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+    cbar = fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.1)
+    cbar.set_label(f'Mean {value}')
+
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, show_legend, y_limits=None):
     """
     Plots multiple lines of P_AD against a specified variable on the x-axis, 
@@ -370,7 +652,7 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, sho
     unique_values = sorted(filtered_df[varying_var].unique())    
     # Normalize unique values for colormap
     norm = plt.Normalize(min(unique_values), max(unique_values))
-    cmap = cm.get_cmap('viridis')
+    cmap = colormaps.get_cmap('viridis')
     
     # Plot each unique value as a separate line
     for value in unique_values:

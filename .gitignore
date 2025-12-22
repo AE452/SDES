@@ -1,9 +1,9 @@
 papers/
 results/
 mathematica/
+jmlr-coverletter-1.0/
 .venv/
 __pycache__/
-jmlr-coverletter-1.0/
 *.csv
 *.pyc
 *.pdf

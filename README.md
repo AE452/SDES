@@ -69,7 +69,7 @@ from MultiAgent.MultiAgent_DQ import Algorithm
 # Initialize algorithm with parameters
 algo = Algorithm(
     e=0.1,              # Exploration parameter (epsilon)
-    lambda_val=0.5,     # Eligibility trace parameter
+    lambda_val=0.5,     # Inertia parameter
     alpha=0.1,          # Learning rate
     delta=0.7,          # Discount factor
     init_mode="random", # Initialization mode

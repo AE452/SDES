@@ -24,7 +24,7 @@ def main():
     
     # Algorithm parameters
     e = 0.1              # Exploration parameter (epsilon)
-    lambda_val = 0.5     # Eligibility trace parameter
+    lambda_val = 0.5     # Inertia parameter
     alpha = 0.1          # Learning rate
     delta = 0.7          # Discount factor
     init_mode = "latin"  # Initialization mode: "latin", "uniform", or "fixed"
@@ -34,7 +34,7 @@ def main():
     
     print(f"\nParameters:")
     print(f"  Epsilon (e): {e}")
-    print(f"  Lambda: {lambda_val}")
+    print(f"  Inertia: {lambda_val}")
     print(f"  Alpha: {alpha}")
     print(f"  Delta: {delta}")
     print(f"  Init mode: {init_mode}")

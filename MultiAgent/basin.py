@@ -402,7 +402,7 @@ class VectorFieldAutomatic:
             ax.grid(True, alpha=0.2)
             if self.show_trajectory or self.show_basin:
                 try:
-                    ax.legend(fontsize=8)
+                ax.legend(fontsize=8)
                 except:
                     pass  # Skip legend if there's an issue
 

@@ -1,4 +1,4 @@
-# Asynchronous Decentralized Q-Learning for Multi-Agent Games
+# Decentralized Partial Batch Q-Learning for Multi-Agent Games
 
 This repository contains the implementation and analysis tools for studying asynchronous decentralized Q-learning in multi-agent game theory settings, with a focus on the Prisoner's Dilemma game.
 

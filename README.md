@@ -1,6 +1,6 @@
-# Decentralized Partial Batch Q-Learning for Multi-Agent Games
+# Decentralized Partial Batch  Q-Learning for Multi-Agent Games
 
-This repository contains the implementation and analysis tools for studying asynchronous decentralized Q-learning in multi-agent game theory settings, with a focus on the Prisoner's Dilemma game.
+This repository contains the implementation and analysis tools for studying Decentralized Partial Batch  Q-learning in multi-agent game theory settings, with a focus on the Prisoner's Dilemma game.
 
 ## Overview
 
@@ -11,7 +11,7 @@ This project investigates the dynamics of Q-learning algorithms in multi-agent e
 
 ## Key Features
 
-- **Multi-Agent Q-Learning**: Implementation of asynchronous decentralized Q-learning for two-player games
+- **Multi-Agent Q-Learning**: Implementation of Decentralized Partial Batch  Q-learning for two-player games
 - **Basin of Attraction Visualization**: Tools for plotting and analyzing convergence regions
 - **Strategy Detection**: Automatic detection of learned strategies from Q-value trajectories
 - **Theoretical Q-Value Calculations**: Analytical solutions for Q-values under different strategies

@@ -28,8 +28,6 @@ This project investigates the dynamics of Q-learning algorithms in multi-agent e
 │   └── comparison_algorithms.py  # Algorithm comparison utilities
 ├── SingleAgent/             # Single-agent analysis
 │   └── SingleAgent.py       # Single-agent Q-value calculations
-├── Pricing/                 # Pricing model implementations
-│   └── dynamicdemand.py     # Dynamic pricing and demand models
 ├── examples/                # Example scripts and usage demonstrations
 ├── utils.py                 # Utility functions for data processing and visualization
 └── dashboard.py             # Interactive dashboard for results visualization

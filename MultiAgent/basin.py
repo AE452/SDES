@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import warnings
 # --------------------------------------------------------
 # Geometric interpretation of strategies and Best Responses
 # 
@@ -394,12 +395,18 @@ class VectorFieldAutomatic:
             ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
             ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
             ax.set_aspect('equal')
-            ax.set_xlabel(f'Agent 1 ΔQ ({state_name})')
-            ax.set_ylabel(f'Agent 2 ΔQ ({state_name})')
+            # Use LaTeX for delta symbol (\Delta)
+            ax.set_xlabel(f'Agent 1 $\\Delta$Q ({state_name})')
+            ax.set_ylabel(f'Agent 2 $\\Delta$Q ({state_name})')
             ax.set_title(f'{state_name}: {self.strategy1} vs {self.strategy2}')
             ax.grid(True, alpha=0.2)
             if self.show_trajectory or self.show_basin:
-                ax.legend(fontsize=8)
+                try:
+                    ax.legend(fontsize=8)
+                except:
+                    pass  # Skip legend if there's an issue
 
         plt.tight_layout()
-        plt.show()
+        # In Jupyter notebooks, figures are displayed automatically at the end of cell execution
+        # Don't call plt.show() as it can cause display issues
+        # The figure will be shown automatically by Jupyter

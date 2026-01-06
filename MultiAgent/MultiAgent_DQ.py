@@ -98,7 +98,8 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
     return Q
 
 
-
+#Algo 1 has TD logic incorporated, the diff is in the update_q_values, 
+# if you want to keep TD merge that function in Algorithm, it is more correct to the theory in the paper
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
     def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1= None,  strategy2= None, verbose=False):

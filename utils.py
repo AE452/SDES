@@ -39,7 +39,30 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     if y_var not in df.columns:
         raise ValueError(f"The specified y-axis variable '{y_var}' is not in the dataframe.")
 
-    y_limits = (-0.1, 0.7) if use_same_scale else None
+    # Calculate global y-limits from all data if use_same_scale is True
+    if use_same_scale:
+        all_y_values = []
+        for fixed_vars in param_sets:
+            fixed_vars_copy = fixed_vars.copy()
+            fixed_vars_copy['M'] = m
+            filtered_df = df.copy()
+            for var, value in fixed_vars_copy.items():
+                filtered_df = filtered_df[filtered_df[var] == value]
+            if not filtered_df.empty:
+                all_y_values.extend(filtered_df[y_var].values)
+        
+        if all_y_values:
+            y_min = min(all_y_values)
+            y_max = max(all_y_values)
+            # Add 5% padding on each side for better visualization
+            y_range = y_max - y_min
+            padding = y_range * 0.05 if y_range > 0 else 0.1
+            y_limits = (y_min - padding, y_max + padding)
+        else:
+            y_limits = (-0.1, 0.7)  # Fallback if no data
+    else:
+        y_limits = None
+    
     wspace, hspace = (0.02, 0.15) if use_same_scale else (0.2, 0.2)
 
     fig, axes = plt.subplots(3, 3, figsize=(12, 8), 
@@ -75,7 +98,6 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
             ax.label_outer()
 
     plt.show()
-
 def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None):
     """
     Plots multiple lines in a single subplot without adding a legend.
@@ -611,74 +633,6 @@ def heatmap_3d_voxels(df, xaxis, yaxis, zaxis, value='P_AD'):
 
     plt.tight_layout()
     plt.show()
-
-
-def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, ax, show_legend, y_limits=None):
-    """
-    Plots multiple lines of P_AD against a specified variable on the x-axis, 
-    with each line representing a unique value of the varying variable.
-    
-    Parameters:
-        df (pd.DataFrame): The dataframe containing the data.
-        fixed_vars (dict): Dictionary of variables to fix with their values, e.g., {'delta': 0.786, 'lambda': 0.132}.
-        x_var (str): The variable to plot on the x-axis.
-        varying_var (str): The variable to vary, creating multiple lines.
-        ax (matplotlib.axes.Axes): The axis to plot on.
-        show_legend (bool): Flag to display the legend on the first subplot.
-        y_limits (tuple, optional): Tuple of (y_min, y_max) for the y-axis limits.
-    """
-    # Validate inputs
-    if 'P_AD' not in df.columns:
-        raise ValueError("The dataframe must contain the column 'P_AD' for plotting.")
-    if x_var not in df.columns:
-        raise ValueError(f"The specified x-axis variable '{x_var}' is not in the dataframe.")
-    if varying_var not in df.columns:
-        raise ValueError(f"The specified varying variable '{varying_var}' is not in the dataframe.")
-    for var in fixed_vars:
-        if var not in df.columns:
-            raise ValueError(f"The fixed variable '{var}' is not in the dataframe.")
-    
-    # Filter the dataframe based on fixed variables
-    filtered_df = df.copy()
-    for var, value in fixed_vars.items():
-        filtered_df = filtered_df[filtered_df[var] == value]
-    
-    # Check if there is any data left after filtering
-    if filtered_df.empty:
-        print(f"No data available for the specified fixed variables: {fixed_vars}")
-        return
-    
-    # Get unique values of the varying variable
-    unique_values = sorted(filtered_df[varying_var].unique())    
-    # Normalize unique values for colormap
-    norm = plt.Normalize(min(unique_values), max(unique_values))
-    cmap = colormaps.get_cmap('viridis')
-    
-    # Plot each unique value as a separate line
-    for value in unique_values:
-        subset = filtered_df[filtered_df[varying_var] == value]
-        if not subset.empty:
-            ax.plot(
-                subset[x_var], 
-                subset['P_GT'], 
-                marker='o', 
-                label=f"{varying_var}={value:.3f}", 
-                color=cmap(norm(value)),
-            )
-    
-    # Title and labels
-    title = "Fixed Parameters: " + ", ".join(f"{key}={value}" for key, value in fixed_vars.items())
-    ax.set_title(f"Analysis of {x_var} vs P_GT with Varying {varying_var}\n{title}")
-    ax.set_xlabel(x_var)
-    ax.set_ylabel('P_GT')
-    if show_legend:
-        ax.legend(title=varying_var)
-    ax.grid()
-
-    # Set y-limits if provided
-    if y_limits is not None:
-        ax.set_ylim(y_limits)
-
 
 def trajectory_dynamics_plot(x, y, zoom_range=None):
     """

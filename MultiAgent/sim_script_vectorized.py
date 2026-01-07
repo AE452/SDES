@@ -10,7 +10,7 @@ import concurrent.futures
 import multiprocessing
 from gc import collect
 
-#this is the function used
+#this has been the function used for the simulations
 def run_experiment_chunk_vect(parameter_combinations_chunk):
     
     results_chunk = []

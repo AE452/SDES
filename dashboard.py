@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from scipy.spatial import KDTree
-
+#This is an interactive dashboard used for visualize the phase diagram from the simulation data
 # Assuming the dataframe (df) is already loaded like this:
 # df = pd.read_csv('your_dataframe.csv')  # Replace with actual data loading
 df = pd.read_csv('./results/results_from_vectorized_script_raw.csv')

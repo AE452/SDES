@@ -29,7 +29,7 @@ def enforce_q_sign_for_state(q, desired_sign, state_idx):
 
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
-    def __init__(self, DC=1, CC=0.8, DD=0.2, CD=0):
+    def __init__(self, DC=1, CC=0.8, DD=0.5, CD=0):
         self.r1 = np.array([[CC, CD], [DC, DD]])
         self.r2 = self.r1.T
 
@@ -233,10 +233,6 @@ class Algorithm:
                 q1_history.append(q1.copy())
                 q2_history.append(q2.copy())
 
-                # If inner loop timed out, continue to next outer loop iteration
-                if time.time() - q_loop_start_time > 1*timeout_inner:
-                    continue
-
             # Store history for each sample
             q1_history_per_sample[m] = q1_history.copy()
             q2_history_per_sample[m] = q2_history.copy()
@@ -252,10 +248,6 @@ class Algorithm:
             # Print summary if verbose is enabled
             if verbose:
                 print(self.summary(start_time))
-
-            # If the outer loop timed out, continue to the next sample
-            if time.time() - loop_start_time > 1 * timeout_outer:
-                continue
 
         return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
 
@@ -404,10 +396,6 @@ class Algorithm_1:
                 q1_history.append(q1.copy())
                 q2_history.append(q2.copy())
 
-                # If inner loop timed out, continue to next outer loop iteration
-                if time.time() - q_loop_start_time > 1*timeout_inner:
-                    continue
-
             # Store history for each sample
             q1_history_per_sample[m] = q1_history.copy()
             q2_history_per_sample[m] = q2_history.copy()
@@ -423,10 +411,6 @@ class Algorithm_1:
             # Print summary if verbose is enabled
             if verbose:
                 print(self.summary(start_time))
-
-            # If the outer loop timed out, continue to the next sample
-            if time.time() - loop_start_time > 1 * timeout_outer:
-                continue
 
         return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
 

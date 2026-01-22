@@ -1,6 +1,6 @@
 import itertools
 import time
-from MultiAgent_DQ import Algorithm
+from MultiAgent_DQ import Algorithm_1 as Algorithm
 from utils import convert_dict_to_mean_df
 import pandas as pd
 import numpy as np
@@ -9,6 +9,8 @@ import gc
 import concurrent.futures
 import multiprocessing
 from gc import collect
+import logging
+from datetime import datetime
 
 #this has been the function used for the simulations
 def run_experiment_chunk_vect(parameter_combinations_chunk):
@@ -21,7 +23,7 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
             random_uniform=random_uniform, tolerance=1e-5, 
             M=int(M_value), verbose=False
         )
-        q1_history_per_sample, q2_history_per_sample, batch_times = algo.run()
+        q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict = algo.run()
 
         # Process results
         dfs_1 = convert_dict_to_mean_df(q1_history_per_sample, mean=False)
@@ -211,74 +213,196 @@ def run_experiment_a_old(parameter_combinations, file_path="results_vect_fixed.c
 
     print("\nProcessing complete.")
 
-def run_experiment_with_timeout(comb, time_limit):
+def run_experiment_with_timeout(comb, time_limit, comb_index=None):
     """Attempt to run a combination with a retry mechanism."""
     retries = 0  # Track the number of retries
     
     # Start the timer for the experiment
     start_time = time.time()
+    
+    comb_str = f"Index {comb_index}: {comb}" if comb_index is not None else str(comb)
 
     while retries < 1:  # Retry only once (for a total of 2 attempts)
         try:
             # Check the elapsed time before each run
             elapsed_time = time.time() - start_time
             if elapsed_time >= time_limit:
-                raise TimeoutError(f"Timeout occurred for combination {comb} after {elapsed_time:.2f} seconds.")
+                error_msg = f"Timeout occurred for combination {comb_str} after {elapsed_time:.2f} seconds."
+                logging.error(error_msg)
+                raise TimeoutError(error_msg)
             
             # Run the experiment
+            logging.info(f"Starting combination {comb_str}")
             results_chunk = run_experiment_chunk_vect([comb])
+            logging.info(f"Successfully completed combination {comb_str}")
             
             # Return results if successful
             return results_chunk  
         except TimeoutError as e:
-            print(f"Error with combination {comb}: {e}")
+            error_msg = f"Timeout error with combination {comb_str}: {e}"
+            logging.error(error_msg)
+            print(f"\n{error_msg}")
             retries += 1  # Increment retry counter
             if retries < 2:
-                print(f"Retrying {comb} (attempt #{retries})...")
+                print(f"Retrying {comb_str} (attempt #{retries})...")
                 start_time = time.time()  # Restart the timer for the next attempt
         except Exception as e:
-            print(f"Unexpected error with combination {comb}: {e}")
+            error_msg = f"Unexpected error with combination {comb_str}: {e}"
+            logging.error(error_msg, exc_info=True)
+            print(f"\n{error_msg}")
+            import traceback
+            traceback.print_exc()
             break  # Break out of the loop for any unexpected error
 
-    print(f"Skipping combination {comb} after {retries} retries.")
+    print(f"Skipping combination {comb_str} after {retries} retries.")
     return None  # Return None if both attempts failed
 
-def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time.csv", time_limit=300):
-    """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task."""
+def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time.csv", time_limit=300, start_index=0):
+    """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task.
     
-    with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
-        futures = [
-            executor.submit(run_experiment_with_timeout, comb, time_limit)  # Submit tasks for each combination
-            for comb in parameter_combinations
+    Parameters:
+    -----------
+    parameter_combinations : list
+        List of parameter combinations to process
+    file_path : str
+        Path to save results CSV file
+    time_limit : int
+        Time limit in seconds for each combination
+    start_index : int
+        Starting index for progress tracking (useful when resuming from a specific point)
+    """
+    
+    # Setup logging
+    log_file = file_path.replace('.csv', '_log.txt')
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()
         ]
-        
-        completed = 0
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                results_chunk = future.result(timeout=time_limit)  # Ensure timeout for each result
-                if results_chunk is not None:
-                    save_results(results_chunk, file_path)  # Save the results if no timeout occurs
-                else:
-                    print(f"Skipping combination due to timeout or error.")
+    )
+    
+    logging.info(f"Starting experiment with {len(parameter_combinations)} combinations, starting from index {start_index}")
+    logging.info(f"Results will be saved to: {file_path}")
+    logging.info(f"Log file: {log_file}")
+    
+    total_combinations = len(parameter_combinations) + start_index
+    
+    # Save checkpoint file with current progress
+    checkpoint_file = file_path.replace('.csv', '_checkpoint.txt')
+    
+    try:
+        with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
+            # Create a mapping of futures to their indices and combinations for better error tracking
+            future_to_info = {}
+            for idx, comb in enumerate(parameter_combinations):
+                current_index = start_index + idx
+                future = executor.submit(run_experiment_with_timeout, comb, time_limit, current_index)
+                future_to_info[future] = {
+                    'index': current_index,
+                    'combination': comb
+                }
+            
+            completed = 0
+            failed_combinations = []
+            
+            for future in concurrent.futures.as_completed(future_to_info):
+                info = future_to_info[future]
+                current_index = info['index']
+                comb = info['combination']
                 
-                completed += 1  # Track progress
-                progress = (completed) / len(parameter_combinations) * 100
-                print(f"\rProgress: {progress:.2f}% ({completed}/{len(parameter_combinations)})", end="")
-            except concurrent.futures.TimeoutError:
-                print(f"Timeout occurred for a parameter combination, retrying.")
-            except Exception as e:
-                print(f"Unexpected error: {e}")
+                # Update checkpoint
+                with open(checkpoint_file, 'w') as f:
+                    f.write(f"Last processed index: {current_index}\n")
+                    f.write(f"Completed: {completed}/{len(parameter_combinations)}\n")
+                    f.write(f"Combination: {comb}\n")
+                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                
+                try:
+                    results_chunk = future.result(timeout=time_limit + 10)  # Add small buffer to timeout
+                    if results_chunk is not None:
+                        save_results(results_chunk, file_path)  # Save the results if no timeout occurs
+                        logging.info(f"Successfully saved results for index {current_index}")
+                    else:
+                        error_msg = f"Skipping combination at index {current_index} due to timeout or error. Combination: {comb}"
+                        logging.warning(error_msg)
+                        print(f"\n{error_msg}")
+                        failed_combinations.append((current_index, comb, "Timeout or error"))
+                    
+                    completed += 1  # Track progress
+                    current_absolute = start_index + completed
+                    progress = (completed) / len(parameter_combinations) * 100
+                    print(f"\rProgress: {progress:.2f}% ({current_absolute}/{total_combinations}) - Completed: {completed}/{len(parameter_combinations)}", end="")
+                    
+                except concurrent.futures.TimeoutError:
+                    error_msg = f"Timeout occurred for combination at index {current_index}. Combination: {comb}"
+                    logging.error(error_msg)
+                    print(f"\n{error_msg}")
+                    failed_combinations.append((current_index, comb, "Timeout"))
+                    
+                except Exception as e:
+                    error_msg = f"Unexpected error at index {current_index}: {e}. Combination: {comb}"
+                    logging.error(error_msg, exc_info=True)
+                    print(f"\n{error_msg}")
+                    import traceback
+                    traceback.print_exc()
+                    failed_combinations.append((current_index, comb, str(e)))
+                    
+                    # Save error details to a separate file
+                    error_file = file_path.replace('.csv', '_errors.txt')
+                    with open(error_file, 'a') as f:
+                        f.write(f"\n{'='*80}\n")
+                        f.write(f"Index: {current_index}\n")
+                        f.write(f"Combination: {comb}\n")
+                        f.write(f"Error: {e}\n")
+                        f.write(f"Traceback:\n")
+                        traceback.print_exc(file=f)
+                        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        
+        # Summary
+        logging.info(f"Processing complete. Total: {completed}/{len(parameter_combinations)}")
+        if failed_combinations:
+            logging.warning(f"Failed combinations: {len(failed_combinations)}")
+            for idx, comb, error in failed_combinations:
+                logging.warning(f"  Index {idx}: {error} - {comb}")
+        
+        print("\nProcessing complete.")
+        if failed_combinations:
+            print(f"\nWarning: {len(failed_combinations)} combinations failed. Check log file: {log_file}")
+            
+    except KeyboardInterrupt:
+        logging.warning("Experiment interrupted by user")
+        print("\n\nExperiment interrupted. Checkpoint saved.")
+        raise
+    except Exception as e:
+        logging.critical(f"Critical error in run_experiment_a: {e}", exc_info=True)
+        print(f"\n\nCritical error: {e}")
+        print(f"Check log file for details: {log_file}")
+        raise
 
-    print("\nProcessing complete.")
+
+def read_checkpoint(file_path="results_vect_paramsfixed_time.csv"):
+    """Read the last checkpoint to see where the experiment stopped."""
+    checkpoint_file = file_path.replace('.csv', '_checkpoint.txt')
+    if os.path.exists(checkpoint_file):
+        with open(checkpoint_file, 'r') as f:
+            content = f.read()
+            print("Last checkpoint:")
+            print(content)
+            return content
+    else:
+        print("No checkpoint file found.")
+        return None
 
 
 # Test the parallel combination generation
 if __name__ == "__main__":
     alpha_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959,1]
     lambda_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959]
-    M_values = [20, 100, 500, 1000, 5000]
-    epsilon_values = [0.05, 0.35, 0.6]
-    delta_values = [0.35, 0.5, 0.75, 0.95] 
+    M_values = [20, 100, 500]
+    epsilon_values = [0.05, 0.35]
+    delta_values = [0.5, 0.75, 0.95] 
 
 
     # Function to round each linspace value to the nearest multiple of 3
@@ -299,5 +423,6 @@ if __name__ == "__main__":
     
     # Run the experiment with the generated combinations
     print(f"Generated {len(parameter_combinations)} combinations.")
-    run_experiment_a(parameter_combinations)
+    start_idx = 7339
+    run_experiment_a(parameter_combinations[start_idx:], start_index=start_idx)
 

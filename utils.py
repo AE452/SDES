@@ -65,7 +65,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     
     wspace, hspace = (0.02, 0.15) if use_same_scale else (0.2, 0.2)
 
-    fig, axes = plt.subplots(3, 3, figsize=(12, 8), 
+    fig, axes = plt.subplots(3, 2, figsize=(10, 8), 
                              gridspec_kw={'wspace': wspace, 'hspace': hspace}, 
                              constrained_layout=False)
     axes = axes.flatten()
@@ -79,7 +79,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
         )
         # Set axis labels per subplot
         # Only show x-label for bottom row
-        if i in [6, 7, 8]:
+        if i in [4,5]:
             axes[i].set_xlabel(greek_labels.get(x_var, x_var))
         else:
             axes[i].set_xlabel("")

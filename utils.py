@@ -14,14 +14,40 @@ import matplotlib.cm as cm
 import seaborn as sns
 import matplotlib as mpl
 
-# Use LaTeX for text rendering
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
+# LaTeX rendering disabled by default to avoid font issues
+# Uncomment the lines below if you have LaTeX installed and want to use it
+# mpl.rcParams['text.usetex'] = True
+# mpl.rcParams['font.family'] = 'serif'
+# mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
 
-def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True):
+# Use regular matplotlib fonts (works without LaTeX)
+mpl.rcParams['text.usetex'] = False
+mpl.rcParams['font.family'] = 'serif'
+
+def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis'):
     """
     Plots multiple subplots with a single shared legend.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Dataframe containing the data
+    param_sets : list of dict
+        List of parameter sets to fix for each subplot
+    x_var : str
+        Variable to plot on x-axis
+    varying_var : str
+        Variable that varies (creates multiple lines)
+    y_var : str
+        Variable to plot on y-axis
+    m : int or float
+        Value of M to filter by
+    use_same_scale : bool
+        Whether to use the same y-axis scale for all subplots
+    cmap : str or matplotlib.colors.Colormap, optional
+        Colormap to use for the lines. Default is 'viridis'.
+        Good options: 'viridis', 'plasma', 'inferno', 'magma', 'cividis', 
+                      'coolwarm', 'RdYlBu_r', 'turbo', 'tab10', 'Set2'
     """
 
     # Mapping of variable names to Greek labels
@@ -75,7 +101,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     for i, fixed_vars in enumerate(param_sets):
         fixed_vars['M'] = m
         handles, labels = plot_analysis_multiple_lines_sub(
-            df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits
+            df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits, cmap=cmap
         )
         # Set axis labels per subplot
         # Only show x-label for bottom row
@@ -98,9 +124,15 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
             ax.label_outer()
 
     plt.show()
-def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None):
+
+def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis'):
     """
     Plots multiple lines in a single subplot without adding a legend.
+    
+    Parameters:
+    -----------
+    cmap : str or matplotlib.colors.Colormap, optional
+        Colormap to use for the lines. Default is 'viridis'.
     """
 
     greek_labels = {
@@ -129,7 +161,12 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
 
     unique_values = sorted(filtered_df[varying_var].unique())    
     norm = plt.Normalize(min(unique_values), max(unique_values))
-    cmap = colormaps.get_cmap('viridis')
+    
+    # Handle both string and Colormap objects
+    if isinstance(cmap, str):
+        cmap = colormaps.get_cmap(cmap)
+    else:
+        cmap = cmap  # Already a Colormap object
 
     handles, labels = [], []
 

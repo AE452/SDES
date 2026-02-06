@@ -440,11 +440,11 @@ class Algorithm_1:
 
         q1_max = ((1 - self.e) * np.max(q1_val, axis=0) + self.e * np.mean(q1_val, axis=0))
         q1_new = np.vstack((np.dot(P1_C_pi2, q1_max), np.dot(P1_D_pi2, q1_max)))
-        q1_new = (1-self.delta)*r1_pi2 + self.delta * q1_new
+        q1_new = r1_pi2 + self.delta * q1_new
 
         q2_max = ((1 - self.e) * np.max(q2_val, axis=0) + self.e * np.mean(q2_val, axis=0))
         q2_new = np.vstack((np.dot(P2_C_pi1, q2_max), np.dot(P2_D_pi1, q2_max)))
-        q2_new = (1-self.delta)*r2_pi1 + self.delta * q2_new
+        q2_new = r2_pi1 + self.delta * q2_new
 
         q_error = np.max(np.abs(q1_new - q1_val) + np.abs(q2_new - q2_val))
         return q1_new, q2_new, q_error

@@ -36,73 +36,184 @@ import warnings
 
 
 
-
 def QvaluesADvsAD(t, r, p, s, epsilon, d):
-    denom = 2 * (d - 1)  # equivalent to 2*(-1 + d)
+    """Q-values for AllD vs AllD"""
+    denom = 4 * (-1 + d)
     
-    first_term = -((2*p - epsilon*p + epsilon*t) / denom) #defect action
-    second_term = -( (2*d*p - d*epsilon*p + epsilon*r - d*epsilon*r 
-                      + 2*s - 2*d*s - epsilon*s + d*epsilon*s + d*epsilon*t) / denom ) #cooperate action
+    q11 = (-((-2 + epsilon) * (-2 + d * epsilon) * p) + 
+           epsilon * (-2 * d * s - 2 * t + d * epsilon * (-r + s + t))) / denom
     
-    return np.array([[first_term, second_term], #StateC (CC)
-                     [first_term, second_term]]) #StateD (CD, DC, DD)
+    q12 = -(2 * epsilon * (r - s) + 4 * s + 
+            d * (-2 + epsilon) * ((-2 + epsilon) * p + 2 * s + epsilon * (r - s - t))) / denom
+    
+    return np.array([[q11, q12],
+                     [q11, q12]])
 
 
 def QvaluesADvsAGT(t, r, p, s, epsilon, d):
-    denom = 2 * (d - 1)  # same as 2*(-1 + d)
-
-    first_term_1 = -((2*p - 2*d*p - epsilon*p + 2*d*epsilon*p + 2*d*t + epsilon*t - 2*d*epsilon*t) / denom)
-    second_term_1 = -((2*d*epsilon*p - d**2*epsilon*p - d*epsilon**2*p + d**2*epsilon**2*p
-                       + epsilon*r - d*epsilon*r + 2*s - 2*d*s - epsilon*s + d*epsilon*s
-                       + 2*d*t - 2*d*epsilon*t + d**2*epsilon*t + d*epsilon**2*t - d**2*epsilon**2*t) / denom)
-
-    first_term_2 = -((epsilon*p + 2*t - epsilon*t) / denom)
-    second_term_2 = -((2*d*p - 2*d**2*p - 2*d*epsilon*p + 3*d**2*epsilon*p
-                       + d*epsilon**2*p - d**2*epsilon**2*p
-                       + 2*r - 2*d*r - epsilon*r + d*epsilon*r
-                       + epsilon*s - d*epsilon*s
-                       + 2*d**2*t + 2*d*epsilon*t - 3*d**2*epsilon*t
-                       - d*epsilon**2*t + d**2*epsilon**2*t) / denom)
-
-    return np.array([[first_term_1, second_term_1],
-                     [first_term_2, second_term_2]])
-
-
-def QvaluesGTvsGT(t, r, p, s, epsilon, d):
-    denom1 = 2 * (d - 1)  # same as 2*(-1 + d)
-    denom2 = (2 - 2*d + d*epsilon)  # extra denominator factor
-
-    first_term_1 = -((2*d*p + epsilon*p - 2*d*epsilon*p
-                      + 2*t - 2*d*t - epsilon*t + 2*d*epsilon*t) / denom1)
-
-    second_term_1 = -((2*d*epsilon*p - d*epsilon**2*p
-                       + 4*r - 4*d*r - 2*epsilon*r + 2*d*epsilon*r
-                       + 2*epsilon*s - 2*d*epsilon*s
-                       + d*epsilon**2*t) / (denom1 * denom2))
-
-    first_term_2 = -((2*p - epsilon*p + epsilon*t) / denom1)
-
-    second_term_2 = -((4*d*p - 4*d**2*p - 4*d*epsilon*p + 6*d**2*epsilon*p
-                       + d*epsilon**2*p - 2*d**2*epsilon**2*p
-                       + 2*epsilon*r - 2*d*epsilon*r
-                       + 4*s - 8*d*s + 4*d**2*s
-                       - 2*epsilon*s + 6*d*epsilon*s - 4*d**2*epsilon*s
-                       + 2*d*epsilon*t - 2*d**2*epsilon*t
-                       - d*epsilon**2*t + 2*d**2*epsilon**2*t) / (denom1 * denom2))
-
-    return np.array([[first_term_1, second_term_1],
-                     [first_term_2, second_term_2]])
+    """Q-values for AllD vs GTFT"""
+    denom = 2 * (-1 + d) * (-2 + d * (-1 + epsilon) * epsilon)
+    
+    q11 = ((-2 + epsilon) * (-2 + d * (2 + (-2 + epsilon) * epsilon)) * p + 
+           d * epsilon * (-((-2 + epsilon) * r) + epsilon * (1 + d - d * epsilon) * s) + 
+           (2 * epsilon + d * (4 + epsilon * (-6 + (2 + d * (-1 + epsilon) - epsilon) * epsilon))) * t) / denom
+    
+    q12 = (2 * epsilon * (r - s) + 4 * s - 
+           d**2 * (-2 + epsilon) * (-1 + epsilon) * epsilon * (s - t) + 
+           d * (-4 * s + 4 * t + epsilon * ((-2 + epsilon)**2 * p + 4 * s - 6 * t - 
+                                             epsilon * (r + s + (-4 + epsilon) * t)))) / denom
+    
+    q21 = (epsilon * ((2 + 2 * d**2 * (-1 + epsilon)**2 - d * epsilon**2) * p - 
+                      d * (-2 + epsilon) * r + d * epsilon * (1 + d - d * epsilon) * s) - 
+           (-2 + epsilon) * (2 + d * (d * (-1 + epsilon) - epsilon) * epsilon) * t) / denom
+    
+    q22 = (-2 * (-2 + epsilon) * r + 2 * epsilon * s + 
+           d * (-((-2 + epsilon) * ((2 + (-2 + epsilon) * epsilon) * p + (-2 + epsilon) * r)) - 
+                epsilon**2 * s + (-2 + epsilon)**2 * epsilon * t) + 
+           d**2 * (-2 + epsilon) * (-1 + epsilon) * (2 * (-1 + epsilon) * p + 2 * t - 
+                                                      epsilon * (s + t))) / denom
+    
+    return np.array([[q11, q12],
+                     [q21, q22]])
 
 
 def QvaluesADvsAC(t, r, p, s, epsilon, d):
-    denom = 2 * (d - 1)  # same as 2*(-1 + d)
+    """Q-values for AllD vs AllC"""
+    denom = 4 * (-1 + d)
+    
+    q11 = (d * epsilon**2 * (p + r - s - t) - 4 * t + 
+           2 * epsilon * (-p - d * r + t + d * t)) / denom
+    
+    q12 = (2 * (-2 + epsilon) * r - 2 * epsilon * s + 
+           d * (-2 + epsilon) * (-2 * r + epsilon * (p + r - s - t) + 2 * t)) / denom
+    
+    return np.array([[q11, q12],
+                     [q11, q12]])
 
-    first_term = -((epsilon*p + 2*t - epsilon*t) / denom)
-    second_term = -((d*epsilon*p + 2*r - 2*d*r - epsilon*r + d*epsilon*r
-                     + epsilon*s - d*epsilon*s + 2*d*t - d*epsilon*t) / denom)
 
-    return np.array([[first_term, second_term],
-                     [first_term, second_term]])
+def QvaluesGTvsGT(t, r, p, s, epsilon, d):
+    """Q-values for GTFT vs GTFT"""
+    denom = 4 * (-1 + d) * (1 + d * (-1 + epsilon))
+    
+    q11 = (-2 * epsilon * p + 2 * (-2 + epsilon) * t - 
+           d**2 * (-2 + epsilon) * (-1 + epsilon) * (2 * (-1 + epsilon) * p + 2 * t - 
+                                                      epsilon * (s + t)) + 
+           d * ((-4 + (8 - 3 * epsilon) * epsilon) * p + 8 * t + 
+                epsilon * (epsilon * (-r + s + 3 * t) - 2 * (s + 5 * t)))) / denom
+    
+    q12 = (2 * (-2 + epsilon) * r - 2 * epsilon * s + 
+           d * (4 * r + epsilon**2 * (p - r - s + t) - 2 * epsilon * (p + r - s + t)) - 
+           d**2 * (-1 + epsilon) * epsilon * (2 * (-1 + epsilon) * p + 2 * t - 
+                                               epsilon * (s + t))) / denom
+    
+    q21 = ((2 * (-2 + epsilon) + d * (4 + epsilon * (-4 - 2 * d * (-1 + epsilon)**2 + epsilon))) * p + 
+           d * epsilon * (-epsilon * r + (1 + d * (-1 + epsilon)) * (-2 + epsilon) * s) + 
+           (1 + d * (-1 + epsilon)) * epsilon * (-2 + d * epsilon) * t) / denom
+    
+    q22 = (-2 * epsilon * r + 2 * (-2 + epsilon) * s - 
+           d**2 * (-2 + epsilon) * (-1 + epsilon) * (2 * (-1 + epsilon) * p + 2 * s - 
+                                                      epsilon * (s + t)) + 
+           d * ((-4 - 3 * (-2 + epsilon) * epsilon) * p + 
+                (-2 + epsilon) * (-4 * s + epsilon * (-r + 3 * s + t)))) / denom
+    
+    return np.array([[q11, q12],
+                     [q21, q22]])
+
+def calculate_boa_boundary_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
+    """
+    Calculate basin-of-attraction boundary vectors for the (AD, GT) configuration.
+    
+    This matches the compute_boa method in VectorFieldAutomatic class.
+    The boundary is determined by the policy gradient differences scaled by (1-δ).
+    
+    Formula: 
+        scale = min(1/((1-δ)|ΔQx|), 1/((1-δ)|ΔQy|))
+        boundary = [(-scale·ΔQx, -scale·ΔQy)]
+    
+    where ΔQx = Q^AD(0) − Q^AD(1) and ΔQy = Q^GT(0) − Q^GT(1)
+
+    Parameters
+    ----------
+    t, r, p, s : float
+        Prisoner's dilemma payoffs (temptation, reward, punishment, sucker).
+    epsilon : float
+        Exploration parameter.
+    d : float
+        Discount factor (delta).
+    state_idx : int
+        State index: 0 = StateBC (CC), 1 = StateA1D.
+
+    Returns
+    -------
+    tuple of np.ndarray
+        (boa_x, boa_y): Basin boundary vectors, each array([0, boundary_value])
+    """
+    Q1 = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
+    Q2 = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+    
+    dx = Q1[0] - Q1[1]
+    dy = Q2[0] - Q2[1]
+    
+    # Scale factor matching VectorFieldAutomatic.compute_boa
+    scale = min(1 / ((1 - d) * abs(dx) + 1e-8),
+                1 / ((1 - d) * abs(dy) + 1e-8))
+    
+    boa_x = np.array([0, -scale * dx])
+    boa_y = np.array([0, -scale * dy])
+    
+    return boa_x, boa_y
+
+def calculate_pi_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
+    """
+    Calculate basin probability from paper formula.
+    
+    π = (1/2) × min(|ΔQx|, |ΔQy|) / max(|ΔQx|, |ΔQy|)
+    
+    This π represents the basin of whichever strategy has the SMALLER gradient.
+    """
+    Q1 = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
+    Q2 = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+    
+    dx = Q1[0] - Q1[1]
+    dy = Q2[0] - Q2[1]
+    
+    abs_dx = abs(dx)
+    abs_dy = abs(dy)
+    
+    if np.isclose(abs_dx, 0.0) and np.isclose(abs_dy, 0.0):
+        return 0.5  # Equal basins
+    if np.isclose(abs_dx, 0.0):
+        return 0.0  # Only GT has gradient → P(GT)=1, P(AD)=0
+    if np.isclose(abs_dy, 0.0):
+        return 1.0  # Only AD has gradient → P(AD)=1, P(GT)=0
+    
+    # π = basin of smaller gradient
+    pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy)
+    
+    # Determine which strategy has smaller gradient
+    if abs_dx < abs_dy:
+        # AD has smaller gradient → π represents P(AD)
+        P_AD = pi_small
+    else:
+        # GT has smaller gradient → π represents P(GT), so P(AD) = 1 - π
+        P_AD = 1.0 - pi_small
+    
+    return float(np.clip(P_AD, 0.0, 1.0))
+
+
+def theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, 
+                                state_idx=0, delta=None, e=None):
+    """
+    Theoretical P(AD) from the (AD, GT) configuration.
+    Uses the paper formula with correct interpretation.
+    """
+    if delta is not None:
+        d = delta
+    if e is not None:
+        epsilon = e
+    
+    P_AD = calculate_pi_ADGT(t, r, p, s, epsilon=epsilon, d=d, state_idx=state_idx)
+    return float(P_AD)
 
 
 class VectorFieldAutomatic:

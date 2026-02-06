@@ -24,7 +24,7 @@ import matplotlib as mpl
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['font.family'] = 'serif'
 
-def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis'):
+def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis', theoretical_basin_AD=None):
     """
     Plots multiple subplots with a single shared legend.
     
@@ -48,6 +48,12 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
         Colormap to use for the lines. Default is 'viridis'.
         Good options: 'viridis', 'plasma', 'inferno', 'magma', 'cividis', 
                       'coolwarm', 'RdYlBu_r', 'turbo', 'tab10', 'Set2'
+    theoretical_basin_AD : float or list of float, optional
+        If float, horizontal line at this value (theoretical basin size for AD) on every panel.
+        If list, must have same length as param_sets; each panel gets the corresponding value.
+        To compute from game parameters (e.g. per panel)::
+            from MultiAgent.basin import theoretical_P_AD_from_ADGT  # ADGT only: 1 - π_ADGT
+            theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, delta=ps['delta'], e=ps['e'])
     """
 
     # Mapping of variable names to Greek labels
@@ -98,10 +104,24 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     
     handles, labels = None, None
 
+    # Resolve theoretical_basin_AD per panel (single value or list)
+    if theoretical_basin_AD is not None:
+        if np.isscalar(theoretical_basin_AD):
+            theoretical_per_panel = [float(theoretical_basin_AD)] * len(param_sets)
+        else:
+            theoretical_per_panel = list(theoretical_basin_AD)
+            if len(theoretical_per_panel) != len(param_sets):
+                raise ValueError("theoretical_basin_AD list length must match param_sets length")
+    else:
+        theoretical_per_panel = [None] * len(param_sets)
+
     for i, fixed_vars in enumerate(param_sets):
         fixed_vars['M'] = m
+        add_theoretical_to_legend = (i == len(param_sets) - 1) and (theoretical_per_panel[i] is not None)
         handles, labels = plot_analysis_multiple_lines_sub(
-            df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits, cmap=cmap
+            df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits, cmap=cmap,
+            theoretical_basin_AD=theoretical_per_panel[i],
+            add_theoretical_to_legend=add_theoretical_to_legend
         )
         # Set axis labels per subplot
         # Only show x-label for bottom row
@@ -125,7 +145,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
 
     plt.show()
 
-def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis'):
+def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis', theoretical_basin_AD=None, add_theoretical_to_legend=False):
     """
     Plots multiple lines in a single subplot without adding a legend.
     
@@ -133,6 +153,10 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
     -----------
     cmap : str or matplotlib.colors.Colormap, optional
         Colormap to use for the lines. Default is 'viridis'.
+    theoretical_basin_AD : float, optional
+        If given, draw a horizontal line at this value (theoretical basin size for AD).
+    add_theoretical_to_legend : bool
+        If True, include the theoretical line in the returned handles/labels for the shared legend.
     """
 
     greek_labels = {
@@ -187,6 +211,16 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
         for k, v in fixed_vars.items() if k != 'M'
     ]
     ax.set_title(r"Fixed: " + ", ".join(title_parts))
+
+    # Theoretical basin size for AD (flat horizontal line)
+    if theoretical_basin_AD is not None:
+        line_th = ax.axhline(
+            theoretical_basin_AD, color='black', linestyle='dashdot', linewidth=1.5,
+            zorder=0, label=r"Theoretical $P_{AD}$"
+        )
+        if add_theoretical_to_legend:
+            handles.append(line_th)
+            labels.append(r"Theoretical $P_{AD}$")
 
     ax.grid()
 

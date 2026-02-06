@@ -423,6 +423,6 @@ if __name__ == "__main__":
     
     # Run the experiment with the generated combinations
     print(f"Generated {len(parameter_combinations)} combinations.")
-    start_idx = 7339
+    start_idx = 0
     run_experiment_a(parameter_combinations[start_idx:], start_index=start_idx)
 

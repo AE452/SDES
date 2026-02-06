@@ -29,8 +29,8 @@ def enforce_q_sign_for_state(q, desired_sign, state_idx):
 
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
-    def __init__(self, DC=1, CC=0.8, DD=0.5, CD=0):
-        self.r1 = np.array([[CC, CD], [DC, DD]])
+    def __init__(self, t=1, r=0.8, p=0.5, s=0):
+        self.r1 = np.array([[r, s], [t, p]])  # [[CC, CD], [DC, DD]]
         self.r2 = self.r1.T
 
 
@@ -102,7 +102,7 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
 # if you want to keep TD merge that function in Algorithm, it is more correct to the theory in the paper
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
-    def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1= None,  strategy2= None, verbose=False):
+    def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1, t, r, p, s, strategy2, verbose=False):
         self.e = e
         self.lambda_val = lambda_val
         self.alpha = alpha
@@ -121,7 +121,7 @@ class Algorithm:
         self.S = 2  # Number of states
         self.A = 2  # Number of actions
 
-        self.payoff = PayoffMatrix()
+        self.payoff = PayoffMatrix(t=t, r=r, p=p, s=s)
         self.state_transition = StateTransition(e)
 
         self.eqC = np.zeros((1, M))

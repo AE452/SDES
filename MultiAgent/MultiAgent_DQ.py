@@ -30,7 +30,7 @@ def enforce_q_sign_for_state(q, desired_sign, state_idx):
 class PayoffMatrix:
     """Represents the payoff matrix for the game."""
     def __init__(self, t=1, r=0.8, p=0.5, s=0):
-        self.r1 = np.array([[r, s], [t, p]])  # [[CC, CD], [DC, DD]]
+        self.r1 = np.array([[r, s], [t, p]])  
         self.r2 = self.r1.T
 
 

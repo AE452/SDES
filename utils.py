@@ -24,7 +24,7 @@ import matplotlib as mpl
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['font.family'] = 'serif'
 
-def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis', theoretical_basin_AD=None):
+def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis', theoretical_basin_AD=None, theoretical_bounds=None):
     """
     Plots multiple subplots with a single shared legend.
     
@@ -46,17 +46,23 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
         Whether to use the same y-axis scale for all subplots
     cmap : str or matplotlib.colors.Colormap, optional
         Colormap to use for the lines. Default is 'viridis'.
-        Good options: 'viridis', 'plasma', 'inferno', 'magma', 'cividis', 
-                      'coolwarm', 'RdYlBu_r', 'turbo', 'tab10', 'Set2'
     theoretical_basin_AD : float or list of float, optional
         If float, horizontal line at this value (theoretical basin size for AD) on every panel.
         If list, must have same length as param_sets; each panel gets the corresponding value.
-        To compute from game parameters (e.g. per panel)::
-            from MultiAgent.basin import theoretical_P_AD_from_ADGT  # ADGT only: 1 - π_ADGT
-            theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, delta=ps['delta'], e=ps['e'])
+    theoretical_bounds : tuple or list of tuple, optional
+        Theoretical (lower_bound, upper_bound) to plot as horizontal lines.
+        If a single tuple (lower, upper), the same bounds are applied to every panel.
+        If a list of tuples, must have same length as param_sets; each panel gets the
+        corresponding (lower, upper) pair. Pass None for a panel to skip it.
+        Example (same bounds for all panels):
+            theoretical_bounds = (0.125, 0.4375)
+        Example (per-panel bounds, e.g. from get_aggregate_bounds()):
+            theoretical_bounds = [
+                get_aggregate_bounds(t=1, r=ps['r'], p=ps['p'], delta=ps['delta']),
+                ...
+            ]
     """
 
-    # Mapping of variable names to Greek labels
     greek_labels = {
         "alpha": r"$\alpha$",
         "beta": r"$\beta$",
@@ -71,7 +77,6 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     if y_var not in df.columns:
         raise ValueError(f"The specified y-axis variable '{y_var}' is not in the dataframe.")
 
-    # Calculate global y-limits from all data if use_same_scale is True
     if use_same_scale:
         all_y_values = []
         for fixed_vars in param_sets:
@@ -86,12 +91,11 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
         if all_y_values:
             y_min = min(all_y_values)
             y_max = max(all_y_values)
-            # Add 5% padding on each side for better visualization
             y_range = y_max - y_min
             padding = y_range * 0.05 if y_range > 0 else 0.1
             y_limits = (y_min - padding, y_max + padding)
         else:
-            y_limits = (-0.1, 0.7)  # Fallback if no data
+            y_limits = (-0.1, 0.7)
     else:
         y_limits = None
     
@@ -104,7 +108,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     
     handles, labels = None, None
 
-    # Resolve theoretical_basin_AD per panel (single value or list)
+    # Resolve theoretical_basin_AD per panel
     if theoretical_basin_AD is not None:
         if np.isscalar(theoretical_basin_AD):
             theoretical_per_panel = [float(theoretical_basin_AD)] * len(param_sets)
@@ -115,17 +119,28 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     else:
         theoretical_per_panel = [None] * len(param_sets)
 
+    # Resolve theoretical_bounds per panel
+    if theoretical_bounds is not None:
+        if isinstance(theoretical_bounds, tuple) and len(theoretical_bounds) == 2 and np.isscalar(theoretical_bounds[0]):
+            # Single (lower, upper) tuple — apply to all panels
+            bounds_per_panel = [theoretical_bounds] * len(param_sets)
+        else:
+            bounds_per_panel = list(theoretical_bounds)
+            if len(bounds_per_panel) != len(param_sets):
+                raise ValueError("theoretical_bounds list length must match param_sets length")
+    else:
+        bounds_per_panel = [None] * len(param_sets)
+
     for i, fixed_vars in enumerate(param_sets):
         fixed_vars['M'] = m
-        add_theoretical_to_legend = (i == len(param_sets) - 1) and (theoretical_per_panel[i] is not None)
+        add_theoretical_to_legend = (i == len(param_sets) - 1)
         handles, labels = plot_analysis_multiple_lines_sub(
             df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits, cmap=cmap,
             theoretical_basin_AD=theoretical_per_panel[i],
+            theoretical_bounds=bounds_per_panel[i],
             add_theoretical_to_legend=add_theoretical_to_legend
         )
-        # Set axis labels per subplot
-        # Only show x-label for bottom row
-        if i in [4,5]:
+        if i in [4, 5]:
             axes[i].set_xlabel(greek_labels.get(x_var, x_var))
         else:
             axes[i].set_xlabel("")
@@ -133,19 +148,18 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
 
         axes[i].set_ylabel(greek_labels.get(y_var, y_var))
 
-    # Add a single legend outside the plot
     if handles and labels:
         fig.legend(handles, labels, title=greek_labels.get(varying_var, varying_var), 
                    loc='upper right', bbox_to_anchor=(1.1, 1))
 
-    # Hide redundant labels for shared scales
     if use_same_scale:
         for ax in axes:
             ax.label_outer()
 
     plt.show()
 
-def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis', theoretical_basin_AD=None, add_theoretical_to_legend=False):
+
+def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis', theoretical_basin_AD=None, theoretical_bounds=None, add_theoretical_to_legend=False):
     """
     Plots multiple lines in a single subplot without adding a legend.
     
@@ -155,8 +169,10 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
         Colormap to use for the lines. Default is 'viridis'.
     theoretical_basin_AD : float, optional
         If given, draw a horizontal line at this value (theoretical basin size for AD).
+    theoretical_bounds : tuple (lower, upper), optional
+        If given, draw two horizontal dashed lines for the theoretical lower and upper bounds.
     add_theoretical_to_legend : bool
-        If True, include the theoretical line in the returned handles/labels for the shared legend.
+        If True, include the theoretical lines in the returned handles/labels for the shared legend.
     """
 
     greek_labels = {
@@ -165,7 +181,6 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
         "delta": r"$\delta$",
         "epsilon": r"$\varepsilon$",
         "e": r"$\varepsilon$",
-
         "lambda": r"$\lambda$",
         "mu": r"$\mu$",
         "M": r"$M$",
@@ -186,11 +201,8 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
     unique_values = sorted(filtered_df[varying_var].unique())    
     norm = plt.Normalize(min(unique_values), max(unique_values))
     
-    # Handle both string and Colormap objects
     if isinstance(cmap, str):
         cmap = colormaps.get_cmap(cmap)
-    else:
-        cmap = cmap  # Already a Colormap object
 
     handles, labels = [], []
 
@@ -205,14 +217,13 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
             handles.append(line)
             labels.append(label)
 
-    # Format subplot title with Greek letters
     title_parts = [
         rf"{greek_labels.get(k, k)}={v}"
         for k, v in fixed_vars.items() if k != 'M'
     ]
     ax.set_title(r"Fixed: " + ", ".join(title_parts))
 
-    # Theoretical basin size for AD (flat horizontal line)
+    # Theoretical basin size for AD
     if theoretical_basin_AD is not None:
         line_th = ax.axhline(
             theoretical_basin_AD, color='black', linestyle='dashdot', linewidth=1.5,
@@ -222,13 +233,29 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
             handles.append(line_th)
             labels.append(r"Theoretical $P_{AD}$")
 
+    # Theoretical lower and upper bounds
+    if theoretical_bounds is not None:
+        lower, upper = theoretical_bounds
+        line_lb = ax.axhline(
+            lower, color='crimson', linestyle='dashed', linewidth=1.5,
+            zorder=0, label=r"Theoretical lower bound"
+        )
+        line_ub = ax.axhline(
+            upper, color='steelblue', linestyle='dashed', linewidth=1.5,
+            zorder=0, label=r"Theoretical upper bound"
+        )
+        if add_theoretical_to_legend:
+            handles.append(line_lb)
+            labels.append(r"Theoretical lower bound")
+            handles.append(line_ub)
+            labels.append(r"Theoretical upper bound")
+
     ax.grid()
 
     if y_limits:
         ax.set_ylim(y_limits)
 
     return handles, labels
-
 
 
 def interactive_3d_voxel(df, xaxis, yaxis, zaxis, value='P_AD', html=False):

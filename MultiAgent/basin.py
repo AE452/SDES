@@ -215,6 +215,188 @@ def theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     P_AD = calculate_pi_ADGT(t, r, p, s, epsilon=epsilon, d=d, state_idx=state_idx)
     return float(P_AD)
 
+"""
+Table printing functions for basin of attraction analysis.
+Add these to your existing notebook that already has the Q-value functions.
+"""
+def get_aggregate_bounds(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0, P_AD = True):
+    Q_AD = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
+    Q_GT = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+    
+    abs_dx = abs(Q_AD[0] - Q_AD[1])
+    abs_dy = abs(Q_GT[0] - Q_GT[1])
+    
+    pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy) if max(abs_dx, abs_dy) > 0 else 0.5
+    pi_GTGT = (1.0 - pi_small) if abs_dx < abs_dy else (pi_small if abs_dx > abs_dy else 0.5)
+    if P_AD:
+        return  1 - (1/16) * (7 + 3 * pi_GTGT), 1 - (1/16) * (2 + 3 * pi_GTGT)
+    return (1/16) * (2 + 3 * pi_GTGT), (1/16) * (7 + 3 * pi_GTGT)
+
+def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
+    """
+    Print one configuration in paper table style.
+    Uses your existing Q-value and basin calculation functions.
+    """
+    # Calculate gradients using your existing functions
+    Q_AD = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
+    Q_GT = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+    
+    dx = Q_AD[0] - Q_AD[1]
+    dy = Q_GT[0] - Q_GT[1]
+    abs_dx = abs(dx)
+    abs_dy = abs(dy)
+    
+    # Calculate π values
+    pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy) if max(abs_dx, abs_dy) > 0 else 0.5
+    
+    if abs_dx < abs_dy:
+        pi_ADAD = pi_small
+        pi_GTGT = 1.0 - pi_small
+        basin_analysis = "|ΔQx| < |ΔQy|"
+        adad_label = "(weaker)"
+        gtgt_label = "(stronger)"
+    elif abs_dx > abs_dy:
+        pi_GTGT = pi_small
+        pi_ADAD = 1.0 - pi_small
+        basin_analysis = "|ΔQy| < |ΔQx|"
+        adad_label = "(stronger)"
+        gtgt_label = "(weaker)"
+    else:
+        pi_GTGT = pi_ADAD = 0.5
+        basin_analysis = "|ΔQx| = |ΔQy|"
+        adad_label = gtgt_label = ""
+    
+    # Calculate conditional probabilities
+    P_GTGT_given_GTGT = 1.0
+    P_GTGT_given_ADGT = pi_GTGT
+    P_GTGT_given_GTAC = 0.5 * (1 + pi_GTGT)
+    
+    # Calculate bounds
+    lower_bound = (1/16) * (2 + 3 * pi_GTGT)
+    upper_bound = (1/16) * (7 + 3 * pi_GTGT)
+    
+    # Print
+    print(f"Payoffs: R = {r}, P = {p}")
+    print(f"{'-'*70}")
+    print()
+    print("Q-value gradients:")
+    print(f"  |ΔQx| (AD gradient)       {abs_dx:.3f}")
+    print(f"  |ΔQy| (GT gradient)       {abs_dy:.3f}")
+    print()
+    print(f"Basin analysis:             {basin_analysis}")
+    print(f"  π_small                   {pi_small:.3f}")
+    print(f"  π_ADAD {adad_label:<17} {pi_ADAD:.3f}")
+    
+    gtgt_str = f"  π_GTGT {gtgt_label:<17} {pi_GTGT:.3f}"
+    if "(stronger)" in gtgt_label:
+        gtgt_str += "  ★"
+    print(gtgt_str)
+    print()
+    
+    print("Conditional probabilities:")
+    print(f"  P(GT,GT | GT,GT)          {P_GTGT_given_GTGT:.4f}")
+    print(f"  P(GT,GT | AD,GT)          {P_GTGT_given_ADGT:.4f}")
+    print(f"  P(GT,GT | GT,AC)          {P_GTGT_given_GTAC:.4f}")
+    print()
+    
+    print("Aggregate bounds:")
+    print(f"  Lower bound               {lower_bound:.3f}")
+    print(f"  Upper bound               {upper_bound:.3f}")
+    print()
+    return lower_bound, upper_bound
+
+def print_side_by_side_tables(configs: list):
+    """
+    Print two configurations side by side.
+    
+    Args:
+        configs: List of tuples (t, r, p, s, epsilon, d, state_idx)
+                 Example: [(1, 0.7, 0.2, 0, 0.1, 0.6, 0), (1, 0.8, 0.5, 0, 0.1, 0.6, 0)]
+    """
+    if len(configs) != 2:
+        raise ValueError("Need exactly 2 configurations")
+    
+    results = []
+    for t, r, p, s, epsilon, d, state_idx in configs:
+        # Calculate gradients
+        Q_AD = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
+        Q_GT = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+        
+        dx = Q_AD[0] - Q_AD[1]
+        dy = Q_GT[0] - Q_GT[1]
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
+        
+        # Calculate π values
+        pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy) if max(abs_dx, abs_dy) > 0 else 0.5
+        
+        if abs_dx < abs_dy:
+            pi_ADAD = pi_small
+            pi_GTGT = 1.0 - pi_small
+            basin_analysis = "|ΔQx| < |ΔQy|"
+            adad_label = "(weaker)"
+            gtgt_label = "(stronger)"
+        elif abs_dx > abs_dy:
+            pi_GTGT = pi_small
+            pi_ADAD = 1.0 - pi_small
+            basin_analysis = "|ΔQy| < |ΔQx|"
+            adad_label = "(stronger)"
+            gtgt_label = "(weaker)"
+        else:
+            pi_GTGT = pi_ADAD = 0.5
+            basin_analysis = "|ΔQx| = |ΔQy|"
+            adad_label = gtgt_label = ""
+        
+        results.append({
+            'r': r, 'p': p,
+            'abs_dx': abs_dx, 'abs_dy': abs_dy,
+            'basin_analysis': basin_analysis,
+            'pi_small': pi_small, 'pi_ADAD': pi_ADAD, 'pi_GTGT': pi_GTGT,
+            'adad_label': adad_label, 'gtgt_label': gtgt_label,
+            'P_GTGT_given_GTGT': 1.0,
+            'P_GTGT_given_ADGT': pi_GTGT,
+            'P_GTGT_given_GTAC': 0.5 * (1 + pi_GTGT),
+            'lower_bound': (1/16) * (2 + 3 * pi_GTGT),
+            'upper_bound': (1/16) * (7 + 3 * pi_GTGT)
+        })
+    
+    # Print headers
+    w = 68
+    print(f"{'='*140}")
+    print(f"{'Basin of Attraction Analysis':^140}")
+    print(f"{'='*140}\n")
+    print(f"{'Payoffs: R = ' + str(results[0]['r']) + ', P = ' + str(results[0]['p']):<{w}} | Payoffs: R = {results[1]['r']}, P = {results[1]['p']}")
+    print(f"{'-'*w} | {'-'*w}\n")
+    
+    # Q-value gradients
+    print(f"{'Q-value gradients:':<{w}} | Q-value gradients:")
+    print(f"{'  |ΔQx| (AD gradient)       ' + f'{results[0]['abs_dx']:.3f}':<{w}} |   |ΔQx| (AD gradient)       {results[1]['abs_dx']:.3f}")
+    print(f"{'  |ΔQy| (GT gradient)       ' + f'{results[0]['abs_dy']:.3f}':<{w}} |   |ΔQy| (GT gradient)       {results[1]['abs_dy']:.3f}\n")
+    
+    # Basin analysis
+    print(f"{'Basin analysis:             ' + results[0]['basin_analysis']:<{w}} | Basin analysis:             {results[1]['basin_analysis']}")
+    print(f"{'  π_small                   ' + f'{results[0]['pi_small']:.3f}':<{w}} |   π_small                   {results[1]['pi_small']:.3f}")
+    print(f"{'  π_ADAD ' + results[0]['adad_label'] + ' ' * (11 - len(results[0]['adad_label'])) + f'{results[0]['pi_ADAD']:.3f}':<{w}} |   π_ADAD {results[1]['adad_label']}{' ' * (11 - len(results[1]['adad_label']))}{results[1]['pi_ADAD']:.3f}")
+    
+    left_gt = f"  π_GTGT {results[0]['gtgt_label']}{' ' * (11 - len(results[0]['gtgt_label']))}{results[0]['pi_GTGT']:.3f}"
+    if "(stronger)" in results[0]['gtgt_label']:
+        left_gt += "  ★"
+    right_gt = f"  π_GTGT {results[1]['gtgt_label']}{' ' * (11 - len(results[1]['gtgt_label']))}{results[1]['pi_GTGT']:.3f}"
+    if "(stronger)" in results[1]['gtgt_label']:
+        right_gt += "  ★"
+    print(f"{left_gt:<{w}} | {right_gt}\n")
+    
+    # Conditional probabilities
+    print(f"{'Conditional probabilities:':<{w}} | Conditional probabilities:")
+    print(f"{'  P(GT,GT | GT,GT)          ' + f'{results[0]['P_GTGT_given_GTGT']:.4f}':<{w}} |   P(GT,GT | GT,GT)          {results[1]['P_GTGT_given_GTGT']:.4f}")
+    print(f"{'  P(GT,GT | AD,GT)          ' + f'{results[0]['P_GTGT_given_ADGT']:.4f}':<{w}} |   P(GT,GT | AD,GT)          {results[1]['P_GTGT_given_ADGT']:.4f}")
+    print(f"{'  P(GT,GT | GT,AC)          ' + f'{results[0]['P_GTGT_given_GTAC']:.4f}':<{w}} |   P(GT,GT | GT,AC)          {results[1]['P_GTGT_given_GTAC']:.4f}\n")
+    
+    # Aggregate bounds
+    print(f"{'Aggregate bounds:':<{w}} | Aggregate bounds:")
+    print(f"{'  Lower bound               ' + f'{results[0]['lower_bound']:.3f}':<{w}} |   Lower bound               {results[1]['lower_bound']:.3f}")
+    print(f"{'  Upper bound               ' + f'{results[0]['upper_bound']:.3f}':<{w}} |   Upper bound               {results[1]['upper_bound']:.3f}\n")
+    print(f"{'='*140}")
 
 class VectorFieldAutomatic:
     """

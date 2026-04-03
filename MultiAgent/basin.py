@@ -219,7 +219,7 @@ def theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
 Table printing functions for basin of attraction analysis.
 Add these to your existing notebook that already has the Q-value functions.
 """
-def get_aggregate_bounds(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0, P_AD = True):
+def get_aggregate_bounds(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0, P_AD=True):
     Q_AD = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
     Q_GT = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
     
@@ -228,9 +228,13 @@ def get_aggregate_bounds(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0
     
     pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy) if max(abs_dx, abs_dy) > 0 else 0.5
     pi_GTGT = (1.0 - pi_small) if abs_dx < abs_dy else (pi_small if abs_dx > abs_dy else 0.5)
+
+    lower_GT = (1/16) * (2 + 4 * pi_GTGT)
+    upper_GT = (1/16) * (7 + 4 * pi_GTGT)
+
     if P_AD:
-        return  1 - (1/16) * (7 + 3 * pi_GTGT), 1 - (1/16) * (2 + 3 * pi_GTGT)
-    return (1/16) * (2 + 3 * pi_GTGT), (1/16) * (7 + 3 * pi_GTGT)
+        return 1 - upper_GT, 1 - lower_GT
+    return lower_GT, upper_GT
 
 def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
     """
@@ -270,10 +274,11 @@ def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
     P_GTGT_given_GTGT = 1.0
     P_GTGT_given_ADGT = pi_GTGT
     P_GTGT_given_GTAC = 0.5 * (1 + pi_GTGT)
+    P_GTGT_given_ACAD = 0.5 * pi_GTGT
     
-    # Calculate bounds
-    lower_bound = (1/16) * (2 + 3 * pi_GTGT)
-    upper_bound = (1/16) * (7 + 3 * pi_GTGT)
+    # Calculate bounds (5 remaining slots each in [0, 1/16])
+    lower_bound = (1/16) * (2 + 4 * pi_GTGT)
+    upper_bound = (1/16) * (7 + 4 * pi_GTGT)
     
     # Print
     print(f"Payoffs: R = {r}, P = {p}")
@@ -297,6 +302,7 @@ def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
     print(f"  P(GT,GT | GT,GT)          {P_GTGT_given_GTGT:.4f}")
     print(f"  P(GT,GT | AD,GT)          {P_GTGT_given_ADGT:.4f}")
     print(f"  P(GT,GT | GT,AC)          {P_GTGT_given_GTAC:.4f}")
+    print(f"  P(GT,GT | AC,AD)          {P_GTGT_given_ACAD:.4f}")
     print()
     
     print("Aggregate bounds:")
@@ -356,8 +362,9 @@ def print_side_by_side_tables(configs: list):
             'P_GTGT_given_GTGT': 1.0,
             'P_GTGT_given_ADGT': pi_GTGT,
             'P_GTGT_given_GTAC': 0.5 * (1 + pi_GTGT),
-            'lower_bound': (1/16) * (2 + 3 * pi_GTGT),
-            'upper_bound': (1/16) * (7 + 3 * pi_GTGT)
+            'P_GTGT_given_ACAD': 0.5 * pi_GTGT,
+            'lower_bound': (1/16) * (2 + 4 * pi_GTGT),
+            'upper_bound': (1/16) * (7 + 4 * pi_GTGT)
         })
     
     # Print headers
@@ -390,7 +397,8 @@ def print_side_by_side_tables(configs: list):
     print(f"{'Conditional probabilities:':<{w}} | Conditional probabilities:")
     print(f"{'  P(GT,GT | GT,GT)          ' + f'{results[0]['P_GTGT_given_GTGT']:.4f}':<{w}} |   P(GT,GT | GT,GT)          {results[1]['P_GTGT_given_GTGT']:.4f}")
     print(f"{'  P(GT,GT | AD,GT)          ' + f'{results[0]['P_GTGT_given_ADGT']:.4f}':<{w}} |   P(GT,GT | AD,GT)          {results[1]['P_GTGT_given_ADGT']:.4f}")
-    print(f"{'  P(GT,GT | GT,AC)          ' + f'{results[0]['P_GTGT_given_GTAC']:.4f}':<{w}} |   P(GT,GT | GT,AC)          {results[1]['P_GTGT_given_GTAC']:.4f}\n")
+    print(f"{'  P(GT,GT | GT,AC)          ' + f'{results[0]['P_GTGT_given_GTAC']:.4f}':<{w}} |   P(GT,GT | GT,AC)          {results[1]['P_GTGT_given_GTAC']:.4f}")
+    print(f"{'  P(GT,GT | AC,AD)          ' + f'{results[0]['P_GTGT_given_ACAD']:.4f}':<{w}} |   P(GT,GT | AC,AD)          {results[1]['P_GTGT_given_ACAD']:.4f}\n")
     
     # Aggregate bounds
     print(f"{'Aggregate bounds:':<{w}} | Aggregate bounds:")

@@ -1,3 +1,31 @@
+"""
+MultiAgent_DQ module
+--------------------
+This file contains two closely related algorithm classes used for
+equilibrium experiments with the same simulation interface.
+
+Algorithm
+  - Baseline implementation.
+  - Uses constructor inputs:
+      (e, lambda_val, alpha, delta, init_mode, tolerance, M,
+       strategy1, t, r, p, s, strategy2, verbose)
+
+Algorithm_1
+  - TD-oriented variant intended to differ primarily in
+    update_q_values (when TD-specific logic is enabled/implemented).
+  - Uses the same input interface (init_mode, strategy1/strategy2,
+    and payoff parameters t, r, p, s) so results are directly
+    comparable to Algorithm.
+  - Backward compatibility is preserved via random_uniform:
+      random_uniform=True  -> init_mode="latin"
+      random_uniform=False -> init_mode="uniform"
+
+Note:
+  At the moment, update_q_values is numerically the same in both
+  classes. The separation is kept so TD logic can be isolated in
+  Algorithm_1 without changing call sites.
+"""
+
 import numpy as np
 import time
 import sys
@@ -98,8 +126,6 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
     return Q
 
 
-#Algo 1 has TD logic incorporated, the diff is in the update_q_values, 
-# if you want to keep TD merge that function in Algorithm, it is more correct to the theory in the paper
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
     def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1, t, r, p, s, strategy2, verbose=False):
@@ -307,12 +333,40 @@ class Algorithm:
 
 class Algorithm_1:
     """Encapsulates the algorithm for calculating equilibria."""
-    def __init__(self, e, lambda_val, alpha, delta, random_uniform, tolerance, M, verbose=False):
+    def __init__(
+        self,
+        e,
+        lambda_val,
+        alpha,
+        delta,
+        init_mode=None,
+        tolerance=1e-6,
+        M=100,
+        strategy1=None,
+        t=1,
+        r=0.8,
+        p=0.5,
+        s=0,
+        strategy2=None,
+        random_uniform=None,
+        verbose=False,
+    ):
         self.e = e
         self.lambda_val = lambda_val
         self.alpha = alpha
         self.delta = delta
-        self.random_uniform = random_uniform
+        # Backward compatibility: map old random_uniform flag to init_mode
+        if init_mode is None:
+            if random_uniform is None:
+                init_mode = "uniform"
+            else:
+                init_mode = "latin" if random_uniform else "uniform"
+        self.init_mode = init_mode
+        if self.init_mode == "fixed":
+            if strategy1 is None or strategy2 is None:
+                raise ValueError("For init_mode='fixed', you must provide strategy1 and strategy2 lists.")
+            self.strategy1 = strategy1
+            self.strategy2 = strategy2
         self.tolerance = tolerance
         self.M = M
         self.verbose = verbose
@@ -321,20 +375,35 @@ class Algorithm_1:
         self.S = 2  # Number of states
         self.A = 2  # Number of actions
 
-        self.payoff = PayoffMatrix()
+        self.payoff = PayoffMatrix(t=t, r=r, p=p, s=s)
         self.state_transition = StateTransition(e)
 
         self.eqC = np.zeros((1, M))
         self.eqD = np.zeros((1, M))
 
     def initialize_q_values(self):
-        """Initializes the Q-values randomly."""
-        if self.random_uniform:
-                q1 = latin_hypercube_sampling(1, self.delta)
-                q2 = latin_hypercube_sampling(1, self.delta)
-        else:
+        """
+        Initializes the Q-values for the two agents.
+        Modes:
+            - "latin"
+            - "uniform"
+            - "fixed" (requires strategy1/strategy2)
+        """
+        if self.init_mode == "latin":
+            q1 = latin_hypercube_sampling(1, self.delta)
+            q2 = latin_hypercube_sampling(1, self.delta)
+        elif self.init_mode == "uniform":
             q1 = generate_unique_complete_samplings(1, self.delta)
             q2 = generate_unique_complete_samplings(1, self.delta)
+        elif self.init_mode == "fixed":
+            if not hasattr(self, "strategy1") or not hasattr(self, "strategy2"):
+                raise ValueError("For init_mode='fixed', you must provide strategy1 and strategy2 as strings.")
+            if not isinstance(self.strategy1, str) or not isinstance(self.strategy2, str):
+                raise TypeError("strategy1 and strategy2 must be strings, e.g., 'AD', 'GT'")
+            q1 = generate_q_for_strategy(self.strategy1, self.delta)
+            q2 = generate_q_for_strategy(self.strategy2, self.delta)
+        else:
+            raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")
 
         return q1, q2
     

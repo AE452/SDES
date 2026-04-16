@@ -20,7 +20,7 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
     for idx, (M_value, alpha, lambda_val, e, delta, random_uniform) in enumerate(parameter_combinations_chunk):
         algo = Algorithm(
             e=e, lambda_val=lambda_val, alpha=alpha, delta=delta,
-            random_uniform=random_uniform, tolerance=1e-5, 
+            random_uniform=random_uniform, tolerance=1e-5, init_mode = "fixed", strategy1 = 'AC', strategy_2 = 'GT',
             M=int(M_value), verbose=False
         )
         q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict = algo.run()
@@ -147,7 +147,7 @@ def chunk_generator(iterator, chunk_size):
     if chunk:
         yield chunk
 
-def run_experiment(parameter_combinations, file_path="results_vect3.csv"):
+def run_experiment(parameter_combinations, file_path="results_vect32000_ACGT.csv"):
     """Run the experiment for all parameter combinations using limited CPU and memory."""
     M_value = 50
     chunk_size = max(1, len(parameter_combinations) // os.cpu_count())
@@ -197,7 +197,7 @@ def generate_combinations_parallel(M, alpha_values, lambda_values, epsilon_value
     # Flatten the list of results if necessary
     return [item for sublist in result for item in sublist]
 
-def run_experiment_a_old(parameter_combinations, file_path="results_vect_fixed.csv"):
+def run_experiment_a_old(parameter_combinations, file_path="results_vect_fixed2000_ACGT.csv"):
     """Run the experiment for all parameter combinations using multiprocessing."""
     with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
         futures = [
@@ -257,7 +257,7 @@ def run_experiment_with_timeout(comb, time_limit, comb_index=None):
     print(f"Skipping combination {comb_str} after {retries} retries.")
     return None  # Return None if both attempts failed
 
-def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time.csv", time_limit=300, start_index=0):
+def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time2000_ACGT.csv", time_limit=300, start_index=0):
     """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task.
     
     Parameters:
@@ -273,7 +273,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
     """
     
     # Setup logging
-    log_file = file_path.replace('.csv', '_log.txt')
+    log_file = file_path.replace('2000_ACGT.csv', '_log.txt')
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -290,7 +290,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
     total_combinations = len(parameter_combinations) + start_index
     
     # Save checkpoint file with current progress
-    checkpoint_file = file_path.replace('.csv', '_checkpoint.txt')
+    checkpoint_file = file_path.replace('2000_ACGT.csv', '_checkpoint.txt')
     
     try:
         with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
@@ -350,7 +350,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
                     failed_combinations.append((current_index, comb, str(e)))
                     
                     # Save error details to a separate file
-                    error_file = file_path.replace('.csv', '_errors.txt')
+                    error_file = file_path.replace('2000_ACGT.csv', '_errors.txt')
                     with open(error_file, 'a') as f:
                         f.write(f"\n{'='*80}\n")
                         f.write(f"Index: {current_index}\n")
@@ -382,9 +382,9 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
         raise
 
 
-def read_checkpoint(file_path="results_vect_paramsfixed_time.csv"):
+def read_checkpoint(file_path="results_vect_paramsfixed_time2000_ACGT.csv"):
     """Read the last checkpoint to see where the experiment stopped."""
-    checkpoint_file = file_path.replace('.csv', '_checkpoint.txt')
+    checkpoint_file = file_path.replace('2000_ACGT.csv', '_checkpoint.txt')
     if os.path.exists(checkpoint_file):
         with open(checkpoint_file, 'r') as f:
             content = f.read()
@@ -398,10 +398,10 @@ def read_checkpoint(file_path="results_vect_paramsfixed_time.csv"):
 
 # Test the parallel combination generation
 if __name__ == "__main__":
-    alpha_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959,1]
-    lambda_values = [0.01, 0.051, 0.092, 0.134, 0.175, 0.216, 0.258, 0.299, 0.34, 0.381, 0.422, 0.464, 0.505, 0.546, 0.588, 0.629, 0.67, 0.711, 0.753, 0.794, 0.835, 0.876, 0.918, 0.959]
-    M_values = [20, 100, 500]
-    epsilon_values = [0.05, 0.35]
+    alpha_values = [0.01,0.25,0.5,0.75,1]
+    lambda_values = [0.01, 0.1, 0.2,0.3,0.4]
+    M_values = [2000]
+    epsilon_values = [0.05, 0.1, 0.2]
     delta_values = [0.5, 0.75, 0.95] 
 
 

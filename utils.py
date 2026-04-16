@@ -77,37 +77,6 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     if y_var not in df.columns:
         raise ValueError(f"The specified y-axis variable '{y_var}' is not in the dataframe.")
 
-    if use_same_scale:
-        all_y_values = []
-        for fixed_vars in param_sets:
-            fixed_vars_copy = fixed_vars.copy()
-            fixed_vars_copy['M'] = m
-            filtered_df = df.copy()
-            for var, value in fixed_vars_copy.items():
-                filtered_df = filtered_df[filtered_df[var] == value]
-            if not filtered_df.empty:
-                all_y_values.extend(filtered_df[y_var].values)
-        
-        if all_y_values:
-            y_min = min(all_y_values)
-            y_max = max(all_y_values)
-            y_range = y_max - y_min
-            padding = y_range * 0.05 if y_range > 0 else 0.1
-            y_limits = (y_min - padding, y_max + padding)
-        else:
-            y_limits = (-0.1, 0.7)
-    else:
-        y_limits = None
-    
-    wspace, hspace = (0.02, 0.15) if use_same_scale else (0.2, 0.2)
-
-    fig, axes = plt.subplots(3, 2, figsize=(10, 8), 
-                             gridspec_kw={'wspace': wspace, 'hspace': hspace}, 
-                             constrained_layout=False)
-    axes = axes.flatten()
-    
-    handles, labels = None, None
-
     # Resolve theoretical_basin_AD per panel
     if theoretical_basin_AD is not None:
         if np.isscalar(theoretical_basin_AD):
@@ -130,6 +99,43 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
                 raise ValueError("theoretical_bounds list length must match param_sets length")
     else:
         bounds_per_panel = [None] * len(param_sets)
+
+    if use_same_scale:
+        all_y_values = []
+        for i, fixed_vars in enumerate(param_sets):
+            fixed_vars_copy = fixed_vars.copy()
+            fixed_vars_copy['M'] = m
+            filtered_df = df.copy()
+            for var, value in fixed_vars_copy.items():
+                filtered_df = filtered_df[filtered_df[var] == value]
+            if not filtered_df.empty:
+                all_y_values.extend(filtered_df[y_var].values)
+            # Include theoretical references in the shared axis range
+            if theoretical_per_panel[i] is not None:
+                all_y_values.append(float(theoretical_per_panel[i]))
+            if bounds_per_panel[i] is not None:
+                lb, ub = bounds_per_panel[i]
+                all_y_values.extend([float(lb), float(ub)])
+        
+        if all_y_values:
+            y_min = min(all_y_values)
+            y_max = max(all_y_values)
+            y_range = y_max - y_min
+            padding = y_range * 0.05 if y_range > 0 else 0.1
+            y_limits = (y_min - padding, y_max + padding)
+        else:
+            y_limits = (-0.1, 0.7)
+    else:
+        y_limits = None
+    
+    wspace, hspace = (0.02, 0.15) if use_same_scale else (0.2, 0.2)
+
+    fig, axes = plt.subplots(3, 2, figsize=(10, 8), 
+                             gridspec_kw={'wspace': wspace, 'hspace': hspace}, 
+                             constrained_layout=False)
+    axes = axes.flatten()
+    
+    handles, labels = None, None
 
     for i, fixed_vars in enumerate(param_sets):
         fixed_vars['M'] = m

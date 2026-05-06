@@ -5,6 +5,7 @@ jmlr-coverletter-1.0/
 .venv/
 __pycache__/
 *.csv
+*.png
 *.pyc
 *.pdf
 *.tex

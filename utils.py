@@ -24,7 +24,25 @@ import matplotlib as mpl
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['font.family'] = 'serif'
 
-def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_scale=True, cmap='viridis', theoretical_basin_AD=None, theoretical_bounds=None):
+def _fmt_compact(value):
+    """
+    Compact numeric formatter for legend labels.
+    Example: 0.010 -> 0.01, 0.500 -> 0.5
+    """
+    if isinstance(value, (int, np.integer)):
+        return str(value)
+    if isinstance(value, (float, np.floating)):
+        s = f"{value:.3f}".rstrip('0').rstrip('.')
+        return "0" if s in ("-0", "") else s
+    return str(value)
+
+def plot_multiple_panels(
+    df, param_sets, x_var, varying_var, y_var, m,
+    use_same_scale=True, cmap='viridis',
+    theoretical_basin_AD=None, theoretical_bounds=None,
+    y_axis_label=None, theoretical_line_label=None,
+    theoretical_bounds_labels=None
+):
     """
     Plots multiple subplots with a single shared legend.
     
@@ -66,7 +84,7 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     greek_labels = {
         "alpha": r"$\alpha$",
         "beta": r"$\beta$",
-        "delta": r"$\delta$",
+        "delta": r"$\gamma$",
         "lambda": r"$\lambda$",
         "mu": r"$\mu$",
         "M": r"$M$",
@@ -115,7 +133,10 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
                 all_y_values.append(float(theoretical_per_panel[i]))
             if bounds_per_panel[i] is not None:
                 lb, ub = bounds_per_panel[i]
-                all_y_values.extend([float(lb), float(ub)])
+                if lb is not None:
+                    all_y_values.append(float(lb))
+                if ub is not None:
+                    all_y_values.append(float(ub))
         
         if all_y_values:
             y_min = min(all_y_values)
@@ -144,7 +165,9 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
             df, fixed_vars, x_var, varying_var, y_var, axes[i], y_limits, cmap=cmap,
             theoretical_basin_AD=theoretical_per_panel[i],
             theoretical_bounds=bounds_per_panel[i],
-            add_theoretical_to_legend=add_theoretical_to_legend
+            add_theoretical_to_legend=add_theoretical_to_legend,
+            theoretical_line_label=theoretical_line_label,
+            theoretical_bounds_labels=theoretical_bounds_labels
         )
         if i in [4, 5]:
             axes[i].set_xlabel(greek_labels.get(x_var, x_var))
@@ -152,11 +175,25 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
             axes[i].set_xlabel("")
             axes[i].set_xticklabels([])
 
-        axes[i].set_ylabel(greek_labels.get(y_var, y_var))
+        axes[i].set_ylabel(y_axis_label if y_axis_label is not None else greek_labels.get(y_var, y_var))
 
     if handles and labels:
-        fig.legend(handles, labels, title=greek_labels.get(varying_var, varying_var), 
-                   loc='upper right', bbox_to_anchor=(1.1, 1))
+        # Compact horizontal legend above the panel grid.
+        ncols = len(labels)
+        fig.legend(
+            handles, labels,
+            title=None,
+            loc='upper center',
+            bbox_to_anchor=(0.5, 0.99),
+            ncol=ncols,
+            frameon=False,
+            fontsize=9,
+            columnspacing=0.9,
+            handletextpad=0.4,
+            borderaxespad=0.2,
+        )
+        # Reserve top space for the external legend.
+        fig.subplots_adjust(top=0.86)
 
     if use_same_scale:
         for ax in axes:
@@ -165,7 +202,12 @@ def plot_multiple_panels(df, param_sets, x_var, varying_var, y_var, m, use_same_
     plt.show()
 
 
-def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, ax, y_limits=None, cmap='viridis', theoretical_basin_AD=None, theoretical_bounds=None, add_theoretical_to_legend=False):
+def plot_analysis_multiple_lines_sub(
+    df, fixed_vars, x_var, varying_var, y_var, ax,
+    y_limits=None, cmap='viridis', theoretical_basin_AD=None,
+    theoretical_bounds=None, add_theoretical_to_legend=False,
+    theoretical_line_label=None, theoretical_bounds_labels=None
+):
     """
     Plots multiple lines in a single subplot without adding a legend.
     
@@ -184,7 +226,7 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
     greek_labels = {
         "alpha": r"$\alpha$",
         "beta": r"$\beta$",
-        "delta": r"$\delta$",
+        "delta": r"$\gamma$",
         "epsilon": r"$\varepsilon$",
         "e": r"$\varepsilon$",
         "lambda": r"$\lambda$",
@@ -215,7 +257,7 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
     for value in unique_values:
         subset = filtered_df[filtered_df[varying_var] == value]
         if not subset.empty:
-            label = rf"{greek_labels.get(varying_var, varying_var)} = {value:.3f}"
+            label = rf"{greek_labels.get(varying_var, varying_var)} = {_fmt_compact(value)}"
             line, = ax.plot(
                 subset[x_var], subset[y_var], marker='o',
                 label=label, color=cmap(norm(value))
@@ -231,30 +273,43 @@ def plot_analysis_multiple_lines_sub(df, fixed_vars, x_var, varying_var, y_var, 
 
     # Theoretical basin size for AD
     if theoretical_basin_AD is not None:
+        line_label = theoretical_line_label if theoretical_line_label is not None else r"Theoretical"
         line_th = ax.axhline(
             theoretical_basin_AD, color='black', linestyle='dashdot', linewidth=1.5,
-            zorder=0, label=r"Theoretical $P_{AD}$"
+            zorder=0, label=line_label
         )
         if add_theoretical_to_legend:
             handles.append(line_th)
-            labels.append(r"Theoretical $P_{AD}$")
+            labels.append(line_label)
 
     # Theoretical lower and upper bounds
     if theoretical_bounds is not None:
         lower, upper = theoretical_bounds
-        line_lb = ax.axhline(
-            lower, color='crimson', linestyle='dashed', linewidth=1.5,
-            zorder=0, label=r"Theoretical lower bound"
-        )
-        line_ub = ax.axhline(
-            upper, color='steelblue', linestyle='dashed', linewidth=1.5,
-            zorder=0, label=r"Theoretical upper bound"
-        )
+        default_lb_label = r"Theoretical lower bound"
+        default_ub_label = r"Theoretical upper bound"
+        if theoretical_bounds_labels is None:
+            lower_label, upper_label = default_lb_label, default_ub_label
+        else:
+            lower_label, upper_label = theoretical_bounds_labels
+        line_lb = None
+        line_ub = None
+        if lower is not None:
+            line_lb = ax.axhline(
+                lower, color='crimson', linestyle='dashed', linewidth=1.5,
+                zorder=0, label=lower_label
+            )
+        if upper is not None:
+            line_ub = ax.axhline(
+                upper, color='steelblue', linestyle='dashed', linewidth=1.5,
+                zorder=0, label=upper_label
+            )
         if add_theoretical_to_legend:
-            handles.append(line_lb)
-            labels.append(r"Theoretical lower bound")
-            handles.append(line_ub)
-            labels.append(r"Theoretical upper bound")
+            if line_lb is not None:
+                handles.append(line_lb)
+                labels.append(lower_label)
+            if line_ub is not None:
+                handles.append(line_ub)
+                labels.append(upper_label)
 
     ax.grid()
 

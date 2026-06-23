@@ -13,17 +13,27 @@ import logging
 from datetime import datetime
 
 #this has been the function used for the simulations
-def run_experiment_chunk_vect(parameter_combinations_chunk):
+def run_experiment_chunk_vect(parameter_combinations_chunk, record_boundary=False,
+                              strategy1='AC', strategy2='GT', t=1, r=0.7, p=0.2, s=0):
     
     results_chunk = []
 
     for idx, (M_value, alpha, lambda_val, e, delta, random_uniform) in enumerate(parameter_combinations_chunk):
         algo = Algorithm(
             e=e, lambda_val=lambda_val, alpha=alpha, delta=delta,
-            random_uniform=random_uniform, tolerance=1e-5, init_mode = "fixed", strategy1 = 'AC', strategy_2 = 'GT',
+            random_uniform=random_uniform, tolerance=1e-5,
+            init_mode="fixed", strategy1=strategy1, strategy2=strategy2,
+            t=t, r=r, p=p, s=s,
             M=int(M_value), verbose=False
         )
-        q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict = algo.run()
+        run_out = algo.run(record_boundary=record_boundary)
+        if record_boundary:
+            (q1_history_per_sample, q2_history_per_sample, batch_times,
+             timeout_out_flag_dict, timeout_vi_flag_dict,
+             boundary_events, analytic_direct_gt) = run_out
+        else:
+            q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict = run_out
+            boundary_events, analytic_direct_gt = {}, {}
 
         # Process results
         dfs_1 = convert_dict_to_mean_df(q1_history_per_sample, mean=False)
@@ -34,9 +44,6 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
         dfs_2_last = pd.concat([df.iloc[[-1]] for df in dfs_2])
 
         # Assign strategies using vectorization
-        #you can futher optimize this part because the detection is the same for both the players,
-        # create detection function with df in input and then this np.where nested is used, 
-        #probably one case is missing and it is going to np.nan (check), rarely happens but it happens
         strategy_1 = np.where(
             (dfs_1_last['Q1'] < dfs_1_last['Q3']) & (dfs_1_last['Q2'] < dfs_1_last['Q4']), 1, 
             np.where(
@@ -66,15 +73,27 @@ def run_experiment_chunk_vect(parameter_combinations_chunk):
         P_GT = ((strategy_df['Strategy_1'] == 2) & (strategy_df['Strategy_2'] == 2)).mean()
         nonconv = (strategy_df['Strategy_1'] != strategy_df['Strategy_2']).sum()
 
-        batch_times_df_max = batch_times_df['Time'].max()
-        batch_times_df_min = batch_times_df['Time'].min()
-        batch_times_df_mean = batch_times_df['Time'].mean()
-        # Save result
-        results_chunk.append({'M': int(M_value),
+        result_row = {'M': int(M_value),
             'alpha': alpha, 'lambda': lambda_val, 'e': e, 'delta': delta,
             'random_uniform': random_uniform, 'P_AD': P_AD, 'P_GT': P_GT,
-            'nonconv': nonconv, 'time_max': batch_times_df_max, 'time_min': batch_times_df_min, 'time_mean': batch_times_df_mean
-        })
+            'nonconv': nonconv,
+            'time_max': batch_times_df['Time'].max(),
+            'time_min': batch_times_df['Time'].min(),
+            'time_mean': batch_times_df['Time'].mean(),
+        }
+
+        if record_boundary:
+            n = len(boundary_events)
+            p_direct_traj = sum(1 for v in boundary_events.values() if v == 'A1D_first') / n if n else np.nan
+            p_via_acad = sum(1 for v in boundary_events.values() if v == 'BC_first') / n if n else np.nan
+            p_direct_analytic = np.nanmean(list(analytic_direct_gt.values())) if analytic_direct_gt else np.nan
+            result_row.update({
+                'P_direct_GT': p_direct_traj,
+                'P_via_ACAD': p_via_acad,
+                'P_direct_GT_analytic': p_direct_analytic,
+            })
+
+        results_chunk.append(result_row)
 
     return results_chunk
 
@@ -213,7 +232,7 @@ def run_experiment_a_old(parameter_combinations, file_path="results_vect_fixed20
 
     print("\nProcessing complete.")
 
-def run_experiment_with_timeout(comb, time_limit, comb_index=None):
+def run_experiment_with_timeout(comb, time_limit, comb_index=None, record_boundary=False, **kwargs):
     """Attempt to run a combination with a retry mechanism."""
     retries = 0  # Track the number of retries
     
@@ -233,7 +252,7 @@ def run_experiment_with_timeout(comb, time_limit, comb_index=None):
             
             # Run the experiment
             logging.info(f"Starting combination {comb_str}")
-            results_chunk = run_experiment_chunk_vect([comb])
+            results_chunk = run_experiment_chunk_vect([comb], record_boundary=record_boundary, **kwargs)
             logging.info(f"Successfully completed combination {comb_str}")
             
             # Return results if successful
@@ -257,7 +276,14 @@ def run_experiment_with_timeout(comb, time_limit, comb_index=None):
     print(f"Skipping combination {comb_str} after {retries} retries.")
     return None  # Return None if both attempts failed
 
-def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time2000_ACGT.csv", time_limit=300, start_index=0):
+def _sidecar_path(file_path, suffix):
+    """Derive a sibling path (e.g. results/foo.csv -> results/foo_log.txt)."""
+    base, _ = os.path.splitext(file_path)
+    return f"{base}{suffix}"
+
+
+def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed_time2000_ACGT.csv", time_limit=300, start_index=0,
+                     record_boundary=False, **kwargs):
     """Run the experiment for all parameter combinations using multiprocessing with a time limit for each task.
     
     Parameters:
@@ -272,15 +298,16 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
         Starting index for progress tracking (useful when resuming from a specific point)
     """
     
-    # Setup logging
-    log_file = file_path.replace('2000_ACGT.csv', '_log.txt')
+    # Setup logging (never write logs into the results CSV)
+    log_file = _sidecar_path(file_path, "_log.txt")
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_file),
             logging.StreamHandler()
-        ]
+        ],
+        force=True,
     )
     
     logging.info(f"Starting experiment with {len(parameter_combinations)} combinations, starting from index {start_index}")
@@ -290,7 +317,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
     total_combinations = len(parameter_combinations) + start_index
     
     # Save checkpoint file with current progress
-    checkpoint_file = file_path.replace('2000_ACGT.csv', '_checkpoint.txt')
+    checkpoint_file = _sidecar_path(file_path, "_checkpoint.txt")
     
     try:
         with concurrent.futures.ProcessPoolExecutor(max_workers= 3) as executor:
@@ -298,7 +325,8 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
             future_to_info = {}
             for idx, comb in enumerate(parameter_combinations):
                 current_index = start_index + idx
-                future = executor.submit(run_experiment_with_timeout, comb, time_limit, current_index)
+                future = executor.submit(run_experiment_with_timeout, comb, time_limit, current_index,
+                                         record_boundary, **kwargs)
                 future_to_info[future] = {
                     'index': current_index,
                     'combination': comb
@@ -350,7 +378,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
                     failed_combinations.append((current_index, comb, str(e)))
                     
                     # Save error details to a separate file
-                    error_file = file_path.replace('2000_ACGT.csv', '_errors.txt')
+                    error_file = _sidecar_path(file_path, "_errors.txt")
                     with open(error_file, 'a') as f:
                         f.write(f"\n{'='*80}\n")
                         f.write(f"Index: {current_index}\n")
@@ -384,7 +412,7 @@ def run_experiment_a(parameter_combinations, file_path="results_vect_paramsfixed
 
 def read_checkpoint(file_path="results_vect_paramsfixed_time2000_ACGT.csv"):
     """Read the last checkpoint to see where the experiment stopped."""
-    checkpoint_file = file_path.replace('2000_ACGT.csv', '_checkpoint.txt')
+    checkpoint_file = _sidecar_path(file_path, "_checkpoint.txt")
     if os.path.exists(checkpoint_file):
         with open(checkpoint_file, 'r') as f:
             content = f.read()

@@ -149,6 +149,7 @@ class Algorithm:
 
         self.payoff = PayoffMatrix(t=t, r=r, p=p, s=s)
         self.state_transition = StateTransition(e)
+        self.t, self.r, self.p, self.s = t, r, p, s
 
         self.eqC = np.zeros((1, M))
         self.eqD = np.zeros((1, M))
@@ -377,6 +378,7 @@ class Algorithm_1:
 
         self.payoff = PayoffMatrix(t=t, r=r, p=p, s=s)
         self.state_transition = StateTransition(e)
+        self.t, self.r, self.p, self.s = t, r, p, s
 
         self.eqC = np.zeros((1, M))
         self.eqD = np.zeros((1, M))
@@ -408,11 +410,16 @@ class Algorithm_1:
         return q1, q2
     
 
-    def run(self, verbose=False):
-        """Runs the main algorithm."""
+    def run(self, verbose=False, record_boundary=False):
+        """Runs the main algorithm (Algorithm_1).
+
+        If record_boundary=True, tracks first boundary crossing for (AC,GT) runs.
+        """
         start_time = time.time()
         q1_history_per_sample, q2_history_per_sample, batch_times = {}, {}, {}
-        timeout_out_flag_dict, timeout_vi_flag_dict = {}, {} 
+        timeout_out_flag_dict, timeout_vi_flag_dict = {}, {}
+        boundary_events = {}
+        analytic_direct_gt = {}
         timeout_outer = 60 
         timeout_inner = 30
         
@@ -420,6 +427,11 @@ class Algorithm_1:
             timeout_out_flag = False  # Outer loop timeout flag
             timeout_vi_flag = False  # Inner loop timeout flag
             q1, q2 = self.initialize_q_values()
+            if record_boundary:
+                analytic_direct_gt[m] = analytic_direct_gt_probability_acgt(
+                    q1, q2, t=self.t, r=self.r, p=self.p, s=self.s,
+                    epsilon=self.e, d=self.delta,
+                )
             q1_val = q1.copy()
             q2_val = q2.copy()
             q1_history, q2_history = [], []
@@ -468,6 +480,8 @@ class Algorithm_1:
             # Store history for each sample
             q1_history_per_sample[m] = q1_history.copy()
             q2_history_per_sample[m] = q2_history.copy()
+            if record_boundary:
+                boundary_events[m] = detect_boundary_crossing_acgt(q1_history, q2_history)
             batch_end_time = time.time()  # End time for this batch
             batch_times[m] = batch_end_time - batch_start_time
             timeout_out_flag_dict[m] = timeout_out_flag
@@ -481,6 +495,10 @@ class Algorithm_1:
             if verbose:
                 print(self.summary(start_time))
 
+        if record_boundary:
+            return (q1_history_per_sample, q2_history_per_sample, batch_times,
+                    timeout_out_flag_dict, timeout_vi_flag_dict,
+                    boundary_events, analytic_direct_gt)
         return q1_history_per_sample, q2_history_per_sample, batch_times, timeout_out_flag_dict, timeout_vi_flag_dict
 
 

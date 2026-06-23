@@ -119,6 +119,575 @@ def QvaluesGTvsGT(t, r, p, s, epsilon, d):
     return np.array([[q11, q12],
                      [q21, q22]])
 
+
+# ---------------------------------------------------------------------------
+# Appendix target Δq helpers (paper app:QvalDiff) and Prop. 17 quantities
+# Convention: Δq = q[D] - q[C]; state_idx 0 = BC, 1 = A1D; d ≡ γ.
+# ---------------------------------------------------------------------------
+
+def target_delta_q_AD(t, r, p, s, epsilon, d):
+    """Δq^AD (same in BC and A1D)."""
+    return 0.5 * (2 * p - 2 * s + epsilon * (t + s - r - p))
+
+
+def target_delta_q_AC(t, r, p, s, epsilon, d):
+    """Δq^AC (same in BC and A1D)."""
+    return (t - r) + 0.5 * epsilon * (p + r - s - t)
+
+
+def target_delta_q_GT(t, r, p, s, epsilon, d, state_idx=0):
+    """Δq^GT in BC (0) or A1D (1)."""
+    if state_idx == 0:
+        num = (2 * t - 2 * r + epsilon * (p + r - s - t)
+               - d * (1 - epsilon) * (2 * t - 2 * p - epsilon * (s + t - 2 * p)))
+        den = 2 - 2 * d * (1 - epsilon)
+    else:
+        num = ((2 - 2 * d * (1 - epsilon) ** 2) * p - 2 * (1 - d) * s
+               + epsilon * (t + s - r - p - d * (3 - epsilon) * s - d * (1 - epsilon) * t))
+        den = 2 - 2 * d * (1 - epsilon)
+    return num / den
+
+
+def _resolve_params(d=None, delta=None, epsilon=None, e=None):
+    gamma = d if d is not None else delta
+    eps = epsilon if epsilon is not None else e
+    if gamma is None or eps is None:
+        raise ValueError("Provide discount (d or delta) and exploration (epsilon or e)")
+    return gamma, eps
+
+
+def delta_q_from_qvalues(opponent, state_idx, t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, player_row=0):
+    """Map opponent strategy to Qvalues* Δq for a given player row."""
+    func = {"AD": QvaluesADvsAD, "GT": QvaluesGTvsGT, "AC": QvaluesADvsAC, "AGT": QvaluesADvsAGT}[opponent]
+    q = func(t, r, p, s, epsilon, d)[player_row]
+    return float(q[0] - q[1])
+
+
+def calculate_B_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0,
+                    delta=None, e=None):
+    """
+    BoA(π^GT | (AD, GT)) from eq. Bhat in paper.tex.
+
+    Uses Δq_1^GT(BC) and Δq_2^AD(BC).
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    g1 = abs(target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=state_idx))
+    g2 = abs(target_delta_q_AD(t, r, p, s, eps, gamma))
+    if np.isclose(g1, 0.0) and np.isclose(g2, 0.0):
+        return 0.5
+    if np.isclose(g2, 0.0):
+        return 1.0
+    if np.isclose(g1, 0.0):
+        return 0.0
+    if g2 >= g1:
+        return 0.5 * g1 / g2
+    return 1.0 - 0.5 * g2 / g1
+
+
+def calculate_C_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                    delta=None, e=None):
+    """
+    Lower bound ĉ = P[T_A1D < T_BC] for (AC, GT).
+
+    Correct closed form (verified by MC; paper line 1263 has a typo):
+        ĉ = min(a, b) / (2 * max(a, b))
+    with a = Δq_1^GT(A1D), b = Δq_2^AC(BC).
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    a = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=1)
+    b = target_delta_q_AC(t, r, p, s, eps, gamma)
+    m, M = min(a, b), max(a, b)
+    if np.isclose(M, 0.0):
+        return float("nan")
+    return float(m / (2.0 * M))
+
+
+def _hitting_log_time(x0, target):
+    """Continuous-limit log hitting time for flow toward target from x0."""
+    denom = -target
+    if np.isclose(denom, 0.0):
+        return np.inf
+    ratio = (x0 - target) / denom
+    if ratio <= 0:
+        return np.inf
+    return float(np.log(ratio))
+
+
+def gt_basin_indicator_adgt(x, y, g1_gt, g2_ad):
+    """
+    1 iff (x, y) in BoA(pi^GT) for (AD, GT) in BC (α→0).
+
+    g1_gt = Δq_1^GT(BC) < 0, g2_ad = Δq_2^AD(BC) > 0; typically x > 0, y < 0.
+  GT if player 1 reaches 0 before player 2: T_1 < T_2.
+    """
+    t1 = _hitting_log_time(x, g1_gt)
+    t2 = _hitting_log_time(y, g2_ad)
+    if np.isinf(t1) and np.isinf(t2):
+        return 0.5
+    if np.isinf(t1):
+        return 0.0
+    if np.isinf(t2):
+        return 1.0
+    return 1.0 if t1 < t2 else 0.0
+
+
+def acgt_a1d_first_indicator(x_a1d, y_bc, tgt_a1d, tgt_bc):
+    """1 iff T_A1D < T_BC (Ĉ first-crossing region) from (AC, GT) init."""
+    t_a = _hitting_log_time(x_a1d, tgt_a1d)
+    t_b = _hitting_log_time(y_bc, tgt_bc)
+    if np.isinf(t_a) or np.isinf(t_b):
+        return np.nan
+    return 1.0 if t_a < t_b else 0.0
+
+
+def _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt):
+    """
+    Return 1 if (x_hat, y_hat) leads to π^GT from profile (GT, AD) in BC (α→0).
+
+    Entry plane: x_hat ∈ [-L, 0], y_hat ∈ [0, L]; g1_ad > 0, g2_gt < 0.
+    GT if T_2(y_hat) < T_1(x_hat) (eq. Dhat-g in paper.tex).
+    """
+    if g1_ad <= 0 or g2_gt >= 0:
+        return 0.5
+    if x_hat > 0:
+        return 0.0
+
+    t1 = _hitting_log_time(x_hat, g1_ad)
+    t2 = _hitting_log_time(y_hat, g2_gt)
+    if np.isinf(t1) and np.isinf(t2):
+        return 0.5
+    if np.isinf(t2):
+        return 0.0
+    if np.isinf(t1):
+        return 1.0
+    return 1.0 if t2 < t1 else 0.0
+
+
+def _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star):
+    """BC position when A1D (player 1) boundary hit first (eq. 1291)."""
+    if np.isclose(x_star - x2, 0.0):
+        return np.nan, np.nan
+    x_hat = x_star + x_star * (x1 - x_star) / (x_star - x2)
+    factor = x_star / (x_star - x2)
+    y_hat = y_star + factor * (y1 - y_star)
+    return x_hat, y_hat
+
+
+def calculate_D_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                       n_samples=200_000, seed=0, delta=None, e=None):
+    """
+    Monte Carlo estimate of D̂ = BoA(π^GT | (AC, AD)).
+
+    Uses 50% branch to (GT, AD) and hitting-time propagation when
+    |Δq_1^0(BC)| > |Δq_1^0(A1D)|, plus symmetric BC-first branch.
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    rng = np.random.default_rng(seed)
+    L = 1.0 / (1.0 - gamma)
+
+    x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
+    y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
+    g1_ad = target_delta_q_AD(t, r, p, s, eps, gamma)
+    g2_gt = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
+
+    gt_count = 0.0
+    valid = 0
+
+    for _ in range(n_samples):
+        x1 = rng.uniform(-L, 0.0)
+        x2 = rng.uniform(-L, 0.0)
+        y1 = rng.uniform(-L, 0.0)
+        y2 = rng.uniform(-L, 0.0)
+
+        if abs(x1) > abs(x2):
+            x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
+            if np.isnan(x_hat):
+                continue
+            valid += 1
+            gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
+        elif abs(x2) > abs(x1):
+            # BC-first for player 1: symmetric with y2, y1 roles in A1D vs BC for player 2
+            # Player 2 hits BC first when |y1| > |y2|; propagate x1 at T_BC(y2)
+            if np.isclose(y_star - y2, 0.0):
+                continue
+            y_hat = y_star + y_star * (y1 - y_star) / (y_star - y2)
+            factor = y_star / (y_star - y2)
+            x_hat = x_star + factor * (x1 - x_star)
+            valid += 1
+            gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
+
+    if valid == 0:
+        return float("nan")
+    p_gt_given_gtad = gt_count / valid
+    return 0.5 * p_gt_given_gtad
+
+
+def calculate_D_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                    delta=None, e=None, n_mc=200_000):
+    """D̂ = BoA(π^GT | (AC, AD)) via Monte Carlo over both hitting-order branches."""
+    return calculate_D_hat_mc(t, r, p, s, epsilon, d, n_samples=n_mc, delta=delta, e=e)
+
+
+def _p_xhat_density(x_hat, x_star, gamma):
+    """Marginal p(x_hat | |x1|>|x2|) from proof:PropBoA."""
+    L = 1.0 / (1.0 - gamma)
+    if x_hat <= -L or x_hat >= 0 or np.isclose(x_hat, x_star):
+        return 0.0
+    t = x_hat + L
+    denom = x_hat - x_star
+    return 2 * (1 - gamma) ** 2 * x_star * (0.5 * t ** 2 / denom ** 2 - t / denom)
+
+
+def _p_yhat_density(y_hat, x_star, y_star, gamma):
+    """Marginal p(y_hat | |x1|>|x2|), piecewise from proof:PropBoA."""
+    L = 1.0 / (1.0 - gamma)
+    if y_hat < 0 or y_hat > L:
+        return 0.0
+    y1 = y_star / (1 + x_star * (1 - gamma))
+    y2 = (x_star + y_star) / (1 + x_star * (1 - gamma))
+    c3 = 2 * (1 - gamma) ** 3 / x_star
+
+    def integral(x2_lo, x2_hi):
+        return c3 * ((x2_hi ** 2 * x_star / 2 - x2_hi ** 3 / 3
+                       + x_star * x2_hi / (1 - gamma) - x2_hi ** 2 / (2 * (1 - gamma)))
+                      - (x2_lo ** 2 * x_star / 2 - x2_lo ** 3 / 3
+                         + x_star * x2_lo / (1 - gamma) - x2_lo ** 2 / (2 * (1 - gamma))))
+
+    if 0 <= y_hat <= y1:
+        x2_lo = x_star * y_star / (y_hat - y_star) + x_star
+        return integral(x2_lo, 0.0)
+    if y1 < y_hat <= y2:
+        return (6 * x_star * (1 - gamma) - 3 * x_star * (1 - gamma) + 1) / (3 * x_star)
+    if y2 < y_hat <= L:
+        x2_lo = x_star - (L - y_star) * x_star / (y_hat - y_star)
+        return integral(x2_lo, 0.0)
+    return 0.0
+
+
+def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                               delta=None, e=None, n_grid=400):
+    """Numeric ∫∫ g(x,y) p(x) p(y) dx dy on product distribution (A1D-first branch)."""
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    L = 1.0 / (1.0 - gamma)
+    x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
+    y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
+    g1_ad = x_star
+    g2_gt = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
+
+    xs = np.linspace(-L + 1e-6, -1e-6, n_grid)
+    ys = np.linspace(1e-6, L - 1e-6, n_grid)
+
+    px = np.array([_p_xhat_density(x, x_star, gamma) for x in xs])
+    py = np.array([_p_yhat_density(y, x_star, y_star, gamma) for y in ys])
+    px = np.clip(px, 0, None)
+    py = np.clip(py, 0, None)
+
+    g_grid = np.array([[_boa_gt_indicator_gtad(x, y, g1_ad, g2_gt) for y in ys] for x in xs])
+    integrand = np.outer(px, py) * g_grid
+    p_gt_branch = np.trapz(np.trapz(integrand, ys, axis=1), xs)
+    return 0.5 * float(p_gt_branch)
+
+
+def get_aggregate_bounds_prop17(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                                 delta=None, e=None):
+    """
+    Proposition 17 aggregate bounds for BoA(π^GT):
+        LB = (1/16)(1 + 2B̂ + 2Ĉ + 2D̂)
+        UB = (1/16)(8 + 2B̂ + 2D̂)
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    b_hat = calculate_B_hat(t, r, p, s, eps, gamma)
+    c_hat = calculate_C_hat(t, r, p, s, eps, gamma)
+    d_hat = calculate_D_hat(t, r, p, s, eps, gamma)
+    lower = (1.0 / 16.0) * (1.0 + 2.0 * b_hat + 2.0 * c_hat + 2.0 * d_hat)
+    upper = (1.0 / 16.0) * (8.0 + 2.0 * b_hat + 2.0 * d_hat)
+    return float(lower), float(upper)
+
+
+def hitting_time_probability_C_hat(dq_a1d, dq_bc, target_a1d, target_bc):
+    """P[T_A1D < T_BC] from initial Δq values (continuous limit)."""
+    t_a = _hitting_log_time(dq_a1d, target_a1d)
+    t_b = _hitting_log_time(dq_bc, target_bc)
+    if np.isinf(t_a) or np.isinf(t_b):
+        return np.nan
+    return float(t_a < t_b)
+
+
+def _shade_mask(ax, X, Y, mask, color, alpha=0.22):
+    """Fill boolean mask on axis."""
+    ax.contourf(X, Y, mask.astype(float), levels=[0.5, 1.5], colors=[color], alpha=alpha)
+
+
+def _boa_line_from_targets(ax, g1, g2, gamma, color='red', lw=2, label='BoA boundary'):
+    """Plot BoAB segment from origin to axis intercepts (eq. Bhat geometry)."""
+    scale = min(1.0 / ((1.0 - gamma) * abs(g1) + 1e-8),
+                1.0 / ((1.0 - gamma) * abs(g2) + 1e-8))
+    xs = np.array([0.0, -scale * g1])
+    ys = np.array([0.0, -scale * g2])
+    ax.plot(xs, ys, color=color, linewidth=lw, label=label)
+    return xs, ys
+
+
+def _hitting_boundary_line(xmin, xmax, ymin, ymax, t1, t2):
+    """
+    Curve (t_a = t_b) in (x, y): (x-t1)/(-t1) = (y-t2)/(-t2) for negative init.
+    Returns (xs, ys) clipped to box.
+    """
+    if np.isclose(t1, 0) or np.isclose(t2, 0):
+        return None, None
+    xs = np.linspace(xmin, xmax, 200)
+    ys = t2 + (t2 / t1) * (xs - t1)
+    ok = (ys >= ymin) & (ys <= ymax)
+    return xs[ok], ys[ok]
+
+
+def plot_adgt_boa_validation(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                             q1=None, q2=None, strategy1='AD', strategy2='GT',
+                             alpha=0.01, density=18, ax=None, title=None):
+    """
+    Plot BC dynamics for (AD, GT) with shaded GT basin (B̂) and optional trajectory.
+    """
+    from MultiAgent_DQ import func_map
+
+    gamma = d
+    g1 = target_delta_q_GT(t, r, p, s, epsilon, gamma, state_idx=0)
+    g2 = target_delta_q_AD(t, r, p, s, epsilon, gamma)
+    L = 1.0 / (1.0 - gamma)
+    xmin, xmax, ymin, ymax = 0.0, L, -L, 0.0
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 5))
+    else:
+        fig = ax.figure
+
+    X, Y = np.meshgrid(np.linspace(xmin, xmax, density), np.linspace(ymin, ymax, density))
+    mask = np.vectorize(lambda x, y: gt_basin_indicator_adgt(x, y, g1, g2) > 0.5)(X, Y)
+    _shade_mask(ax, X, Y, mask, color='#2ca02c')
+    from matplotlib.lines import Line2D
+    shade_legend = Line2D([0], [0], color='#2ca02c', lw=8, alpha=0.35, label=r'BoA$(\pi^{GT})$')
+
+    vf = VectorFieldAutomatic(
+        q1=q1, q2=q2, t=t, r=r, p=p, s=s, epsilon=epsilon, d=gamma,
+        func1=func_map[strategy2], func2=func_map[strategy1],
+        strategy1=strategy1, strategy2=strategy2, alpha=alpha, density=density,
+        show_trajectory=q1 is not None, show_basin=False,
+    )
+    vf.add_vector_field(ax, xmin, xmax, ymin, ymax, vf.func1, vf.func2, 0)
+    _boa_line_from_targets(ax, g1, g2, gamma)
+
+    if q1 is not None:
+        ax.quiver(vf.xC[:-1], vf.yC[:-1], vf.uC, vf.vC,
+                  angles='xy', scale_units='xy', scale=1, color='blue', alpha=0.85,
+                  width=0.004, label='Trajectory BC')
+
+    ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_aspect('equal')
+    ax.set_xlabel(r'Agent 1 $\Delta Q$ (BC)')
+    ax.set_ylabel(r'Agent 2 $\Delta Q$ (BC)')
+    b_hat = calculate_B_hat(t, r, p, s, epsilon, gamma)
+    ax.set_title(title or rf'$(AD,GT)$: $\hat{{B}}={b_hat:.3f}$')
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles + [shade_legend], fontsize=8, loc='upper right')
+    ax.grid(True, alpha=0.2)
+    return fig, ax
+
+
+def plot_acgt_boundary_validation(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                                  q1=None, q2=None, alpha=0.01, density=18,
+                                  figsize=(12, 5), title=None):
+    """
+    Joint (Δq_1 A1D, Δq_2 BC) plot with Ĉ first-crossing region and trajectories.
+    """
+    gamma = d
+    tgt_a1d = target_delta_q_GT(t, r, p, s, epsilon, gamma, state_idx=1)
+    tgt_bc = target_delta_q_AC(t, r, p, s, epsilon, gamma)
+    L = 1.0 / (1.0 - gamma)
+    xmin, xmax, ymin, ymax = -L, 0.0, -L, 0.0
+
+    fig, ax = plt.subplots(figsize=figsize)
+    X, Y = np.meshgrid(np.linspace(xmin, xmax, density), np.linspace(ymin, ymax, density))
+    mask = np.vectorize(
+        lambda x, y: acgt_a1d_first_indicator(x, y, tgt_a1d, tgt_bc) == 1.0
+    )(X, Y)
+    _shade_mask(ax, X, Y, mask, color='#ff7f0e')
+    from matplotlib.lines import Line2D
+    shade_legend = Line2D([0], [0], color='#ff7f0e', lw=8, alpha=0.35, label=r'$T_{A1D}<T_{BC}$ (Ĉ region)')
+
+    bx, by = _hitting_boundary_line(xmin, xmax, ymin, ymax, tgt_a1d, tgt_bc)
+    if bx is not None:
+        ax.plot(bx, by, 'r-', lw=2, label='First-crossing boundary')
+
+    if q1 is not None and q2 is not None:
+        x_a1d = q1['Q4'].values - q1['Q2'].values
+        y_bc = q2['Q3'].values - q2['Q1'].values
+        ax.plot(x_a1d, y_bc, 'b-', lw=1.5, alpha=0.9, label='Trajectory')
+        ax.scatter(x_a1d[0], y_bc[0], c='blue', s=40, zorder=5, label='Start')
+        in_c = acgt_a1d_first_indicator(x_a1d[0], y_bc[0], tgt_a1d, tgt_bc) == 1.0
+        ax.scatter(x_a1d[-1], y_bc[-1], c='green' if in_c else 'red', s=40, zorder=5)
+
+    ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_aspect('equal')
+    ax.set_xlabel(r'Agent 1 $\Delta Q$ (A1D)')
+    ax.set_ylabel(r'Agent 2 $\Delta Q$ (BC)')
+    c_hat = calculate_C_hat(t, r, p, s, epsilon, gamma)
+    ax.set_title(title or rf'$(AC,GT)$: $\hat{{C}}={c_hat:.3f}$')
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles + [shade_legend], fontsize=8)
+    ax.grid(True, alpha=0.2)
+    return fig, ax
+
+
+def plot_acad_entry_validation(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                               entry_points=None, density=22, figsize=(6, 5), title=None):
+    r"""Entry plane (x_hat, y_hat) for (GT,AD) with shaded GT basin (D_hat)."""
+    gamma = d
+    g1 = target_delta_q_AD(t, r, p, s, epsilon, gamma)
+    g2 = target_delta_q_GT(t, r, p, s, epsilon, gamma, state_idx=0)
+    L = 1.0 / (1.0 - gamma)
+    xmin, xmax, ymin, ymax = -L, 0.0, 0.0, L
+
+    fig, ax = plt.subplots(figsize=figsize)
+    X, Y = np.meshgrid(np.linspace(xmin, xmax, density), np.linspace(ymin, ymax, density))
+    mask = np.vectorize(lambda x, y: _boa_gt_indicator_gtad(x, y, g1, g2) > 0.5)(X, Y)
+    _shade_mask(ax, X, Y, mask, color='#9467bd')
+    from matplotlib.lines import Line2D
+    shade_legend = Line2D([0], [0], color='#9467bd', lw=8, alpha=0.35, label=r'BoA$(\pi^{GT}|GT,AD)$')
+
+    bx, by = _hitting_boundary_line(xmin, xmax, ymin, ymax, g1, g2)
+    if bx is not None:
+        ax.plot(bx, by, 'r-', lw=2, label=r'$T_2=T_1$ boundary')
+
+    if entry_points is not None:
+        xs, ys = entry_points
+        ax.scatter(xs, ys, c='blue', s=25, alpha=0.7, label=r'Sim entry $(\hat{x},\hat{y})$')
+
+    ax.axhline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.axvline(0, color='gray', linestyle=':', alpha=0.5)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_aspect('equal')
+    ax.set_xlabel(r'$\hat{x}=\Delta q_1(BC)$')
+    ax.set_ylabel(r'$\hat{y}=\Delta q_2(BC)$')
+    d_hat = calculate_D_hat(t, r, p, s, epsilon, gamma, n_mc=100_000)
+    ax.set_title(title or rf'$(AC,AD)\to(GT,AD)$: $\hat{{D}}={d_hat:.3f}$')
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles + [shade_legend], fontsize=8)
+    ax.grid(True, alpha=0.2)
+    return fig, ax
+
+
+def verify_trajectory_in_basin(q1, q2, case, t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6):
+    """
+    Check that each BC/A1D trajectory point lies in the analytic basin for its case.
+
+    Returns dict with fractions in-basin and endpoint strategy guess.
+    """
+    gamma = d
+    if case == 'ADGT':
+        g1 = target_delta_q_GT(t, r, p, s, epsilon, gamma, state_idx=0)
+        g2 = target_delta_q_AD(t, r, p, s, epsilon, gamma)
+        xs = q1['Q3'].values - q1['Q1'].values
+        ys = q2['Q3'].values - q2['Q1'].values
+        ind = np.array([gt_basin_indicator_adgt(x, y, g1, g2) for x, y in zip(xs, ys)])
+        same = bool(np.all(ind == ind[0]))
+        return {
+            'stays_in_initial_basin': same,
+            'initial_basin': 'GT' if ind[0] > 0.5 else 'AD',
+            'frac_in_gt_basin': float(np.mean(ind > 0.5)),
+            'n': len(xs),
+        }
+    if case == 'ACGT':
+        tgt_a1d = target_delta_q_GT(t, r, p, s, epsilon, gamma, state_idx=1)
+        tgt_bc = target_delta_q_AC(t, r, p, s, epsilon, gamma)
+        x0 = q1['Q4'].values[0] - q1['Q2'].values[0]
+        y0 = q2['Q3'].values[0] - q2['Q1'].values[0]
+        ind0 = acgt_a1d_first_indicator(x0, y0, tgt_a1d, tgt_bc)
+        return {'initial_in_C_region': float(ind0 == 1.0), 'x0': x0, 'y0': y0}
+    raise ValueError(f"Unknown case {case}")
+
+
+def sample_acad_entry_points(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, n=200, seed=0):
+    """Sample (x_hat, y_hat) from AC,AD init using paper propagation (both branches)."""
+    gamma, eps = d, epsilon
+    rng = np.random.default_rng(seed)
+    L = 1.0 / (1.0 - gamma)
+    x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
+    y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
+    xs, ys = [], []
+    for _ in range(n):
+        x1 = rng.uniform(-L, 0.0)
+        x2 = rng.uniform(-L, 0.0)
+        y1 = rng.uniform(-L, 0.0)
+        y2 = rng.uniform(-L, 0.0)
+        if abs(x1) > abs(x2):
+            xh, yh = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
+        elif abs(x2) > abs(x1):
+            if np.isclose(y_star - y2, 0.0):
+                continue
+            yh = y_star + y_star * (y1 - y_star) / (y_star - y2)
+            factor = y_star / (y_star - y2)
+            xh = x_star + factor * (x1 - x_star)
+        else:
+            continue
+        if np.isnan(xh):
+            continue
+        xs.append(xh)
+        ys.append(yh)
+    return np.array(xs), np.array(ys)
+
+
+def delta_q_from_q(q, state_idx):
+    """Δq = q[D] - q[C] for one agent matrix q[action, state]."""
+    return float(q[1, state_idx] - q[0, state_idx])
+
+
+def detect_boundary_crossing_acgt(q1_hist, q2_hist):
+    """
+    Detect which axis is crossed first for (AC, GT) dynamics.
+
+    Returns 'A1D_first' if Δq_1(A1D) crosses zero before Δq_2(BC),
+    'BC_first' otherwise, or None if no crossing in history.
+    """
+    if len(q1_hist) < 2:
+        return None
+
+    prev_dq1_a1d = delta_q_from_q(q1_hist[0], 1)
+    prev_dq2_bc = delta_q_from_q(q2_hist[0], 0)
+
+    for k in range(1, len(q1_hist)):
+        dq1_a1d = delta_q_from_q(q1_hist[k], 1)
+        dq2_bc = delta_q_from_q(q2_hist[k], 0)
+
+        crossed_a1d = prev_dq1_a1d < 0 and dq1_a1d >= 0
+        crossed_bc = prev_dq2_bc < 0 and dq2_bc >= 0
+
+        if crossed_a1d and crossed_bc:
+            return "A1D_first"  # tie-break same as analytic measure-zero set
+        if crossed_a1d:
+            return "A1D_first"
+        if crossed_bc:
+            return "BC_first"
+
+        prev_dq1_a1d, prev_dq2_bc = dq1_a1d, dq2_bc
+
+    return None
+
+
+def analytic_direct_gt_probability_acgt(q1, q2, t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6):
+    """Per-sample P[T_A1D < T_BC] from initial Q (α→0 limit)."""
+    tgt_a1d = target_delta_q_GT(t, r, p, s, epsilon, d, state_idx=1)
+    tgt_bc = target_delta_q_AC(t, r, p, s, epsilon, d)
+    dq1_a1d = delta_q_from_q(q1, 1)
+    dq2_bc = delta_q_from_q(q2, 0)
+    return hitting_time_probability_C_hat(dq1_a1d, dq2_bc, tgt_a1d, tgt_bc)
+
+
 def calculate_boa_boundary_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
     """
     Calculate basin-of-attraction boundary vectors for the (AD, GT) configuration.
@@ -130,7 +699,7 @@ def calculate_boa_boundary_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, stat
         scale = min(1/((1-δ)|ΔQx|), 1/((1-δ)|ΔQy|))
         boundary = [(-scale·ΔQx, -scale·ΔQy)]
     
-    where ΔQx = Q^AD(0) − Q^AD(1) and ΔQy = Q^GT(0) − Q^GT(1)
+    where ΔQx = Δq_1^GT(BC) and ΔQy = Δq_2^AD(BC) (eq. Bhat).
 
     Parameters
     ----------
@@ -148,13 +717,9 @@ def calculate_boa_boundary_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, stat
     tuple of np.ndarray
         (boa_x, boa_y): Basin boundary vectors, each array([0, boundary_value])
     """
-    Q1 = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
-    Q2 = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
+    dx = target_delta_q_GT(t, r, p, s, epsilon, d, state_idx=state_idx)
+    dy = target_delta_q_AD(t, r, p, s, epsilon, d)
     
-    dx = Q1[0] - Q1[1]
-    dy = Q2[0] - Q2[1]
-    
-    # Scale factor matching VectorFieldAutomatic.compute_boa
     scale = min(1 / ((1 - d) * abs(dx) + 1e-8),
                 1 / ((1 - d) * abs(dy) + 1e-8))
     
@@ -163,42 +728,10 @@ def calculate_boa_boundary_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, stat
     
     return boa_x, boa_y
 
+
 def calculate_pi_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
-    """
-    Calculate basin probability from paper formula.
-    
-    π = (1/2) × min(|ΔQx|, |ΔQy|) / max(|ΔQx|, |ΔQy|)
-    
-    This π represents the basin of whichever strategy has the SMALLER gradient.
-    """
-    Q1 = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
-    Q2 = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
-    
-    dx = Q1[0] - Q1[1]
-    dy = Q2[0] - Q2[1]
-    
-    abs_dx = abs(dx)
-    abs_dy = abs(dy)
-    
-    if np.isclose(abs_dx, 0.0) and np.isclose(abs_dy, 0.0):
-        return 0.5  # Equal basins
-    if np.isclose(abs_dx, 0.0):
-        return 0.0  # Only GT has gradient → P(GT)=1, P(AD)=0
-    if np.isclose(abs_dy, 0.0):
-        return 1.0  # Only AD has gradient → P(AD)=1, P(GT)=0
-    
-    # π = basin of smaller gradient
-    pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy)
-    
-    # Determine which strategy has smaller gradient
-    if abs_dx < abs_dy:
-        # AD has smaller gradient → π represents P(AD)
-        P_AD = pi_small
-    else:
-        # GT has smaller gradient → π represents P(GT), so P(AD) = 1 - π
-        P_AD = 1.0 - pi_small
-    
-    return float(np.clip(P_AD, 0.0, 1.0))
+    """P(AD) = 1 - B̂ for profile (AD, GT)."""
+    return float(1.0 - calculate_B_hat(t, r, p, s, epsilon, d, state_idx=state_idx))
 
 
 def theoretical_P_AD_from_ADGT(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, 
@@ -220,20 +753,10 @@ Table printing functions for basin of attraction analysis.
 Add these to your existing notebook that already has the Q-value functions.
 """
 def get_aggregate_bounds(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0, P_AD=True):
-    Q_AD = QvaluesADvsAD(t, r, p, s, epsilon, d)[state_idx]
-    Q_GT = QvaluesGTvsGT(t, r, p, s, epsilon, d)[state_idx]
-    
-    abs_dx = abs(Q_AD[0] - Q_AD[1])
-    abs_dy = abs(Q_GT[0] - Q_GT[1])
-    
-    pi_small = 0.5 * min(abs_dx, abs_dy) / max(abs_dx, abs_dy) if max(abs_dx, abs_dy) > 0 else 0.5
-    pi_GTGT = (1.0 - pi_small) if abs_dx < abs_dy else (pi_small if abs_dx > abs_dy else 0.5)
-
-    lower_GT = (1/16) * (2 + 4 * pi_GTGT)
-    upper_GT = (1/16) * (7 + 4 * pi_GTGT)
-
+    """Prop. 17 aggregate bounds; delegates to get_aggregate_bounds_prop17."""
+    lower_GT, upper_GT = get_aggregate_bounds_prop17(t, r, p, s, epsilon, d)
     if P_AD:
-        return 1 - upper_GT, 1 - lower_GT
+        return 1.0 - upper_GT, 1.0 - lower_GT
     return lower_GT, upper_GT
 
 def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
@@ -272,13 +795,11 @@ def print_paper_table(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0):
     
     # Calculate conditional probabilities
     P_GTGT_given_GTGT = 1.0
-    P_GTGT_given_ADGT = pi_GTGT
-    P_GTGT_given_GTAC = 0.5 * (1 + pi_GTGT)
-    P_GTGT_given_ACAD = 0.5 * pi_GTGT
+    P_GTGT_given_ADGT = calculate_B_hat(t, r, p, s, epsilon, d)
+    P_GTGT_given_GTAC = 0.5 * (1 + calculate_B_hat(t, r, p, s, epsilon, d))
+    P_GTGT_given_ACAD = calculate_D_hat(t, r, p, s, epsilon, d)
     
-    # Calculate bounds (5 remaining slots each in [0, 1/16])
-    lower_bound = (1/16) * (2 + 4 * pi_GTGT)
-    upper_bound = (1/16) * (7 + 4 * pi_GTGT)
+    lower_bound, upper_bound = get_aggregate_bounds_prop17(t, r, p, s, epsilon, d)
     
     # Print
     print(f"Payoffs: R = {r}, P = {p}")
@@ -377,13 +898,15 @@ def print_side_by_side_tables(configs: list):
     
     # Q-value gradients
     print(f"{'Q-value gradients:':<{w}} | Q-value gradients:")
-    print(f"{'  |ΔQx| (AD gradient)       ' + f'{results[0]['abs_dx']:.3f}':<{w}} |   |ΔQx| (AD gradient)       {results[1]['abs_dx']:.3f}")
-    print(f"{'  |ΔQy| (GT gradient)       ' + f'{results[0]['abs_dy']:.3f}':<{w}} |   |ΔQy| (GT gradient)       {results[1]['abs_dy']:.3f}\n")
+    print(f"{'  |ΔQx| (AD gradient)       ' + format(results[0]['abs_dx'], '.3f'):<{w}} |   |ΔQx| (AD gradient)       {results[1]['abs_dx']:.3f}")
+    print(f"{'  |ΔQy| (GT gradient)       ' + format(results[0]['abs_dy'], '.3f'):<{w}} |   |ΔQy| (GT gradient)       {results[1]['abs_dy']:.3f}\n")
     
     # Basin analysis
     print(f"{'Basin analysis:             ' + results[0]['basin_analysis']:<{w}} | Basin analysis:             {results[1]['basin_analysis']}")
-    print(f"{'  π_small                   ' + f'{results[0]['pi_small']:.3f}':<{w}} |   π_small                   {results[1]['pi_small']:.3f}")
-    print(f"{'  π_ADAD ' + results[0]['adad_label'] + ' ' * (11 - len(results[0]['adad_label'])) + f'{results[0]['pi_ADAD']:.3f}':<{w}} |   π_ADAD {results[1]['adad_label']}{' ' * (11 - len(results[1]['adad_label']))}{results[1]['pi_ADAD']:.3f}")
+    print(f"{'  π_small                   ' + format(results[0]['pi_small'], '.3f'):<{w}} |   π_small                   {results[1]['pi_small']:.3f}")
+    pad0 = ' ' * (11 - len(results[0]['adad_label']))
+    pad1 = ' ' * (11 - len(results[1]['adad_label']))
+    print(f"{'  π_ADAD ' + results[0]['adad_label'] + pad0 + format(results[0]['pi_ADAD'], '.3f'):<{w}} |   π_ADAD {results[1]['adad_label']}{pad1}{results[1]['pi_ADAD']:.3f}")
     
     left_gt = f"  π_GTGT {results[0]['gtgt_label']}{' ' * (11 - len(results[0]['gtgt_label']))}{results[0]['pi_GTGT']:.3f}"
     if "(stronger)" in results[0]['gtgt_label']:
@@ -395,15 +918,15 @@ def print_side_by_side_tables(configs: list):
     
     # Conditional probabilities
     print(f"{'Conditional probabilities:':<{w}} | Conditional probabilities:")
-    print(f"{'  P(GT,GT | GT,GT)          ' + f'{results[0]['P_GTGT_given_GTGT']:.4f}':<{w}} |   P(GT,GT | GT,GT)          {results[1]['P_GTGT_given_GTGT']:.4f}")
-    print(f"{'  P(GT,GT | AD,GT)          ' + f'{results[0]['P_GTGT_given_ADGT']:.4f}':<{w}} |   P(GT,GT | AD,GT)          {results[1]['P_GTGT_given_ADGT']:.4f}")
-    print(f"{'  P(GT,GT | GT,AC)          ' + f'{results[0]['P_GTGT_given_GTAC']:.4f}':<{w}} |   P(GT,GT | GT,AC)          {results[1]['P_GTGT_given_GTAC']:.4f}")
-    print(f"{'  P(GT,GT | AC,AD)          ' + f'{results[0]['P_GTGT_given_ACAD']:.4f}':<{w}} |   P(GT,GT | AC,AD)          {results[1]['P_GTGT_given_ACAD']:.4f}\n")
+    print(f"{'  P(GT,GT | GT,GT)          ' + format(results[0]['P_GTGT_given_GTGT'], '.4f'):<{w}} |   P(GT,GT | GT,GT)          {results[1]['P_GTGT_given_GTGT']:.4f}")
+    print(f"{'  P(GT,GT | AD,GT)          ' + format(results[0]['P_GTGT_given_ADGT'], '.4f'):<{w}} |   P(GT,GT | AD,GT)          {results[1]['P_GTGT_given_ADGT']:.4f}")
+    print(f"{'  P(GT,GT | GT,AC)          ' + format(results[0]['P_GTGT_given_GTAC'], '.4f'):<{w}} |   P(GT,GT | GT,AC)          {results[1]['P_GTGT_given_GTAC']:.4f}")
+    print(f"{'  P(GT,GT | AC,AD)          ' + format(results[0]['P_GTGT_given_ACAD'], '.4f'):<{w}} |   P(GT,GT | AC,AD)          {results[1]['P_GTGT_given_ACAD']:.4f}\n")
     
     # Aggregate bounds
     print(f"{'Aggregate bounds:':<{w}} | Aggregate bounds:")
-    print(f"{'  Lower bound               ' + f'{results[0]['lower_bound']:.3f}':<{w}} |   Lower bound               {results[1]['lower_bound']:.3f}")
-    print(f"{'  Upper bound               ' + f'{results[0]['upper_bound']:.3f}':<{w}} |   Upper bound               {results[1]['upper_bound']:.3f}\n")
+    print(f"{'  Lower bound               ' + format(results[0]['lower_bound'], '.3f'):<{w}} |   Lower bound               {results[1]['lower_bound']:.3f}")
+    print(f"{'  Upper bound               ' + format(results[0]['upper_bound'], '.3f'):<{w}} |   Upper bound               {results[1]['upper_bound']:.3f}\n")
     print(f"{'='*140}")
 
 class VectorFieldAutomatic:

@@ -41,7 +41,8 @@ def plot_multiple_panels(
     use_same_scale=True, cmap='viridis',
     theoretical_basin_AD=None, theoretical_bounds=None,
     y_axis_label=None, theoretical_line_label=None,
-    theoretical_bounds_labels=None
+    theoretical_bounds_labels=None,
+    save_path=None, show=True,
 ):
     """
     Plots multiple subplots with a single shared legend.
@@ -175,7 +176,13 @@ def plot_multiple_panels(
             axes[i].set_xlabel("")
             axes[i].set_xticklabels([])
 
-        axes[i].set_ylabel(y_axis_label if y_axis_label is not None else greek_labels.get(y_var, y_var))
+        ylab = y_axis_label if y_axis_label is not None else greek_labels.get(y_var, y_var)
+        # Matplotlib mathtext fails on mixed plain text + $...$ (e.g. "0805: $\\mathrm{BoA}$")
+        if ylab is not None and "$" in str(ylab):
+            stripped = str(ylab).strip()
+            if not (stripped.startswith("$") and stripped.endswith("$")):
+                ylab = greek_labels.get(y_var, y_var)
+        axes[i].set_ylabel(ylab)
 
     if handles and labels:
         # Compact horizontal legend above the panel grid.
@@ -199,7 +206,17 @@ def plot_multiple_panels(
         for ax in axes:
             ax.label_outer()
 
-    plt.show()
+    if save_path is not None:
+        import os
+        os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return fig
 
 
 def plot_analysis_multiple_lines_sub(

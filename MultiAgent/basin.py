@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -187,19 +188,57 @@ def calculate_B_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, state_idx=0,
 def calculate_C_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
                     delta=None, e=None):
     """
-    Lower bound ĉ = P[T_A1D < T_BC] for (AC, GT).
+    Lower bound ĉ = P[T_A1D < T_BC] for (AC, GT) — eq. Chat in paper.tex.
 
-    Correct closed form (verified by MC; paper line 1263 has a typo):
-        ĉ = min(a, b) / (2 * max(a, b))
-    with a = Δq_1^GT(A1D), b = Δq_2^AC(BC).
+        ĉ = g * (2*max(g, h) - h) / (2 * max(g, h)^2)
+    with g = Δq_1^GT(A1D), h = Δq_2^AC(BC).
     """
     gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
-    a = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=1)
-    b = target_delta_q_AC(t, r, p, s, eps, gamma)
-    m, M = min(a, b), max(a, b)
+    g = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=1)
+    h = target_delta_q_AC(t, r, p, s, eps, gamma)
+    M = max(g, h)
     if np.isclose(M, 0.0):
         return float("nan")
-    return float(m / (2.0 * M))
+    return float(g * (2.0 * M - h) / (2.0 * M ** 2))
+
+
+def theoretical_C_hat_from_ACGT(t=1, r=0.7, p=0.2, s=0, epsilon=None, e=None,
+                                 delta=None, d=None):
+    """Alias for calculate_C_hat (notebook / sim validation)."""
+    return calculate_C_hat(
+        t=t, r=r, p=p, s=s,
+        epsilon=epsilon if epsilon is not None else e,
+        d=d if d is not None else delta,
+        delta=delta, e=e,
+    )
+
+
+def calculate_C_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                       n_samples=200_000, seed=0, delta=None, e=None):
+    """MC check of ĉ = P[T_A1D < T_BC] under uniform init on [-L,0]^2."""
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    rng = np.random.default_rng(seed)
+    L = 1.0 / (1.0 - gamma)
+    tgt_a1d = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=1)
+    tgt_bc = target_delta_q_AC(t, r, p, s, eps, gamma)
+    hits = 0
+    for _ in range(n_samples):
+        x = rng.uniform(-L, 0.0)
+        y = rng.uniform(-L, 0.0)
+        if acgt_a1d_first_indicator(x, y, tgt_a1d, tgt_bc) == 1.0:
+            hits += 1
+    return hits / n_samples
+
+
+def theoretical_D_hat_from_ACAD(t=1, r=0.7, p=0.2, s=0, epsilon=None, e=None,
+                                 delta=None, d=None, n_mc=200_000):
+    """Alias for calculate_D_hat (notebook / sim validation)."""
+    return calculate_D_hat(
+        t=t, r=r, p=p, s=s,
+        epsilon=epsilon if epsilon is not None else e,
+        d=d if d is not None else delta,
+        delta=delta, e=e, n_mc=n_mc,
+    )
 
 
 def _hitting_log_time(x0, target):
@@ -278,8 +317,8 @@ def calculate_D_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     """
     Monte Carlo estimate of D̂ = BoA(π^GT | (AC, AD)).
 
-    Uses 50% branch to (GT, AD) and hitting-time propagation when
-    |Δq_1^0(BC)| > |Δq_1^0(A1D)|, plus symmetric BC-first branch.
+    Only the A1D-first branch contributes (BC-first → (AGT,AD) → BoA 0).
+    D̂ = (1/2) * E[g(x̂, ŷ) | |X1| > |X2|].
     """
     gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
     rng = np.random.default_rng(seed)
@@ -294,42 +333,29 @@ def calculate_D_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     valid = 0
 
     for _ in range(n_samples):
-        x1 = rng.uniform(-L, 0.0)
         x2 = rng.uniform(-L, 0.0)
+        x1 = rng.uniform(-L, x2)  # A1D-first: |x1| > |x2|
         y1 = rng.uniform(-L, 0.0)
-        y2 = rng.uniform(-L, 0.0)
 
-        if abs(x1) > abs(x2):
-            x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
-            if np.isnan(x_hat):
-                continue
-            valid += 1
-            gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
-        elif abs(x2) > abs(x1):
-            # BC-first for player 1: symmetric with y2, y1 roles in A1D vs BC for player 2
-            # Player 2 hits BC first when |y1| > |y2|; propagate x1 at T_BC(y2)
-            if np.isclose(y_star - y2, 0.0):
-                continue
-            y_hat = y_star + y_star * (y1 - y_star) / (y_star - y2)
-            factor = y_star / (y_star - y2)
-            x_hat = x_star + factor * (x1 - x_star)
-            valid += 1
-            gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
+        x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
+        if np.isnan(x_hat):
+            continue
+        valid += 1
+        gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
 
     if valid == 0:
         return float("nan")
-    p_gt_given_gtad = gt_count / valid
-    return 0.5 * p_gt_given_gtad
+    return 0.5 * (gt_count / valid)
 
 
 def calculate_D_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
                     delta=None, e=None, n_mc=200_000):
-    """D̂ = BoA(π^GT | (AC, AD)) via Monte Carlo over both hitting-order branches."""
+    """D̂ = BoA(π^GT | (AC, AD)); A1D-first branch only, times Pr[A1D first]=1/2."""
     return calculate_D_hat_mc(t, r, p, s, epsilon, d, n_samples=n_mc, delta=delta, e=e)
 
 
 def _p_xhat_density(x_hat, x_star, gamma):
-    """Marginal p(x_hat | |x1|>|x2|) from proof:PropBoA."""
+    """Marginal p(x_hat | |x1|>|x2|) — NOT a factor in a joint density (x_hat correlates with y_hat via x2)."""
     L = 1.0 / (1.0 - gamma)
     if x_hat <= -L or x_hat >= 0 or np.isclose(x_hat, x_star):
         return 0.0
@@ -339,7 +365,7 @@ def _p_xhat_density(x_hat, x_star, gamma):
 
 
 def _p_yhat_density(y_hat, x_star, y_star, gamma):
-    """Marginal p(y_hat | |x1|>|x2|), piecewise from proof:PropBoA."""
+    """Marginal p(y_hat | |x1|>|x2|), piecewise — NOT independent of x_hat marginally."""
     L = 1.0 / (1.0 - gamma)
     if y_hat < 0 or y_hat > L:
         return 0.0
@@ -364,9 +390,12 @@ def _p_yhat_density(y_hat, x_star, y_star, gamma):
     return 0.0
 
 
-def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
-                               delta=None, e=None, n_grid=400):
-    """Numeric ∫∫ g(x,y) p(x) p(y) dx dy on product distribution (A1D-first branch)."""
+def calculate_D_hat_factorized_wrong(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                                     delta=None, e=None, n_grid=200):
+    """
+    Incorrect estimator: ∫∫ g(x,y) p(x) p(y) treating marginals as independent.
+    Kept for diagnostics only (~20% bias vs honest MC).
+    """
     gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
     L = 1.0 / (1.0 - gamma)
     x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
@@ -377,15 +406,93 @@ def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     xs = np.linspace(-L + 1e-6, -1e-6, n_grid)
     ys = np.linspace(1e-6, L - 1e-6, n_grid)
 
-    px = np.array([_p_xhat_density(x, x_star, gamma) for x in xs])
-    py = np.array([_p_yhat_density(y, x_star, y_star, gamma) for y in ys])
-    px = np.clip(px, 0, None)
-    py = np.clip(py, 0, None)
-
+    px = np.clip([_p_xhat_density(x, x_star, gamma) for x in xs], 0, None)
+    py = np.clip([_p_yhat_density(y, x_star, y_star, gamma) for y in ys], 0, None)
     g_grid = np.array([[_boa_gt_indicator_gtad(x, y, g1_ad, g2_gt) for y in ys] for x in xs])
     integrand = np.outer(px, py) * g_grid
     p_gt_branch = np.trapz(np.trapz(integrand, ys, axis=1), xs)
     return 0.5 * float(p_gt_branch)
+
+
+def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                               delta=None, e=None, n_x2=60, n_inner=40):
+    """
+    Nested quadrature for eq:Dhat-branch: outer x2, inner (x1, y1) at fixed x2.
+    A1D-first branch only; returns same 0.5 weight as legacy helper (GT-branch factor
+    applied by caller). Use calculate_D_hat_mc for production.
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    L = 1.0 / (1.0 - gamma)
+    x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
+    y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
+    g1_ad = x_star
+    g2_gt = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
+
+    dens = 2 * (1 - gamma) ** 3
+    x2_grid = np.linspace(-L, 0.0, n_x2)
+    total = 0.0
+
+    for i in range(len(x2_grid) - 1):
+        x2_lo, x2_hi = x2_grid[i], x2_grid[i + 1]
+        x2_mid = 0.5 * (x2_lo + x2_hi)
+        x1_grid = np.linspace(-L, x2_mid, n_inner)
+        y1_grid = np.linspace(-L, 0.0, n_inner)
+        g_vals = np.zeros((len(x1_grid), len(y1_grid)))
+        for ix, x1 in enumerate(x1_grid):
+            for iy, y1 in enumerate(y1_grid):
+                x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2_mid, y1, x_star, y_star)
+                if not np.isnan(x_hat):
+                    g_vals[ix, iy] = _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
+        inner = np.trapz(np.trapz(g_vals, y1_grid, axis=1), x1_grid)
+        total += inner * dens * (x2_hi - x2_lo)
+
+    return 0.5 * float(total)
+
+
+def diagnose_D_hat_joint(n_samples=100_000, seed=0, **kwargs):
+    """
+    Compare honest joint MC vs incorrect marginal factorization.
+    Returns dict with corr(x_hat, y_hat), D_hat_joint, D_hat_factorized_wrong.
+    """
+    gamma, eps = _resolve_params(
+        d=kwargs.get("d"), delta=kwargs.get("delta"),
+        epsilon=kwargs.get("epsilon"), e=kwargs.get("e"),
+    )
+    t = kwargs.get("t", 1)
+    r = kwargs.get("r", 0.7)
+    p = kwargs.get("p", 0.2)
+    s = kwargs.get("s", 0)
+    L = 1.0 / (1.0 - gamma)
+    x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
+    y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
+    g1_ad = x_star
+    g2_gt = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
+
+    rng = np.random.default_rng(seed)
+    x_hats, y_hats, g_vals = [], [], []
+    for _ in range(n_samples):
+        x2 = rng.uniform(-L, 0.0)
+        x1 = rng.uniform(-L, x2)
+        y1 = rng.uniform(-L, 0.0)
+        x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
+        if np.isnan(x_hat):
+            continue
+        x_hats.append(x_hat)
+        y_hats.append(y_hat)
+        g_vals.append(_boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt))
+
+    x_hats = np.array(x_hats)
+    y_hats = np.array(y_hats)
+    corr = float(np.corrcoef(x_hats, y_hats)[0, 1]) if len(x_hats) > 1 else float("nan")
+    d_joint = float(np.mean(g_vals)) if g_vals else float("nan")
+    d_wrong = calculate_D_hat_factorized_wrong(**kwargs)
+    return {
+        "corr_xhat_yhat_a1d_first": corr,
+        "E_g_honest_joint_a1d_branch": d_joint,  # E[g | |x1|>|x2|], not full D_hat
+        "factorized_marginal_estimate": d_wrong,  # includes erroneous 0.5 GT-branch prefactor
+        "D_hat_mc_full": calculate_D_hat_mc(n_samples=min(n_samples, 50_000), seed=seed, **kwargs),
+        "relative_error_factorized_vs_a1d_branch": (d_wrong - d_joint) / d_joint if d_joint else float("nan"),
+    }
 
 
 def get_aggregate_bounds_prop17(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
@@ -402,6 +509,181 @@ def get_aggregate_bounds_prop17(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     lower = (1.0 / 16.0) * (1.0 + 2.0 * b_hat + 2.0 * c_hat + 2.0 * d_hat)
     upper = (1.0 / 16.0) * (8.0 + 2.0 * b_hat + 2.0 * d_hat)
     return float(lower), float(upper)
+
+
+# ---------------------------------------------------------------------------
+# Map paper hats to saved experiment profiles (read existing CSVs, no new sims)
+# ---------------------------------------------------------------------------
+HAT_PROFILE_MAP = {
+    "B_hat": {
+        "profile": ("AD", "GT"),
+        "hat_fn": "calculate_B_hat",
+        "sim_column": "P_GT",
+        "csv_0702": "results_vect_paramsfixed_time2000_ADGT.csv",  # rows 225+
+        "csv_0805": "results_vect_paramsfixed_time2000_ADGT.csv",  # rows :225
+        "slice_0702": slice(225, None),
+        "slice_0805": slice(None, 225),
+    },
+    "C_hat": {
+        "profile": ("AC", "GT"),
+        "hat_fn": "calculate_C_hat",
+        "sim_columns": ("P_direct_GT_analytic", "P_direct_GT"),
+        "boa_column": "P_GT",
+        "csv_0702": "ACGT_Chat_validate_0702.csv",
+        "csv_0805": "ACGT_Chat_validate_0805.csv",
+        "fallback_csv_0702": "results_vect_paramsfixed_time2000_ACGT0702.csv",
+        "fallback_csv_0805": "results_vect_paramsfixed_time2000_ACGT.csv",
+    },
+    "D_hat": {
+        "profile": ("AC", "AD"),
+        "hat_fn": "calculate_D_hat",
+        "sim_column": "P_GT",
+        "csv_0702": "results_vect_paramsfixed_time2000_ACAD0702.csv",
+        "csv_0805": "results_vect_paramsfixed_time2000_ACAD0805.csv",
+    },
+}
+
+PAYOFF_PRESETS = {
+    "0702": dict(t=1, r=0.7, p=0.2, s=0),
+    "0805": dict(t=1, r=0.8, p=0.5, s=0),
+}
+
+
+def _default_results_dir():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(here, "..", "results"))
+
+
+def load_saved_experiment_csv(name, results_dir=None):
+    """Load a CSV from results/ (or absolute path)."""
+    import os
+    results_dir = results_dir or _default_results_dir()
+    path = name if os.path.isabs(name) else os.path.join(results_dir, name)
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    import pandas as pd
+    return pd.read_csv(path)
+
+
+def add_hat_column(df, hat_name, t=1, r=0.7, p=0.2, s=0, n_mc=50_000):
+    """Add B_hat / C_hat / D_hat column from (delta, e) rows."""
+    import pandas as pd
+    df = df.copy()
+    fn = {"B_hat": calculate_B_hat, "C_hat": calculate_C_hat, "D_hat": calculate_D_hat}[hat_name]
+    col = hat_name
+
+    cache = {}
+    for d, e in df[["delta", "e"]].drop_duplicates().itertuples(index=False):
+        key = (float(d), float(e))
+        kwargs = dict(t=t, r=r, p=p, s=s, epsilon=key[1], d=key[0])
+        if hat_name == "D_hat":
+            kwargs["n_mc"] = n_mc
+        cache[key] = fn(**kwargs)
+
+    df[col] = df.apply(lambda row: cache[(float(row["delta"]), float(row["e"]))], axis=1)
+    return df
+
+
+def summarize_hat_vs_saved_csv(
+    hat_name,
+    preset="0702",
+    results_dir=None,
+    alpha=0.01,
+    lambda_val=0.01,
+    n_mc=50_000,
+    display_rows=False,
+):
+    """
+    Compare paper hat to existing simulation CSV for the matching profile.
+
+    - B_hat  ↔ (AD,GT)  P_GT
+    - C_hat  ↔ (AC,GT)  P_direct_GT_analytic (Chat validate CSVs)
+    - D_hat  ↔ (AC,AD)  P_GT
+    """
+    import os
+    import pandas as pd
+
+    meta = HAT_PROFILE_MAP[hat_name]
+    pay = PAYOFF_PRESETS[preset]
+    t, r, p, s = pay["t"], pay["r"], pay["p"], pay["s"]
+
+    csv_key = f"csv_{preset}"
+    csv_name = meta[csv_key]
+    df = load_saved_experiment_csv(csv_name, results_dir)
+    sl_key = f"slice_{preset}"
+    if sl_key in meta:
+        df = df.iloc[meta[sl_key]]
+
+    df = add_hat_column(df, hat_name, t=t, r=r, p=p, s=s, n_mc=n_mc)
+    hat_col = hat_name if hat_name in df.columns else hat_name  # B_hat etc.
+
+    if alpha is not None:
+        df = df[df["alpha"] == alpha]
+    if lambda_val is not None:
+        df = df[df["lambda"] == lambda_val]
+
+    out = {
+        "hat": hat_name,
+        "preset": preset,
+        "profile": meta["profile"],
+        "payoff": pay,
+        "n_rows": len(df),
+        "csv": csv_name,
+    }
+
+    if hat_name == "C_hat":
+        for col in meta["sim_columns"]:
+            err = df[col] - df[hat_col]
+            out[f"mae_{col}"] = float(err.abs().mean())
+            out[f"max_err_{col}"] = float(err.abs().max())
+        boa_err = df[meta["boa_column"]] - df[hat_col]
+        out["mae_P_GT"] = float(boa_err.abs().mean())
+        out["note"] = "P_GT is full BoA(GT|AC,GT), expected >= C_hat"
+    else:
+        col = meta["sim_column"]
+        err = df[col] - df[hat_col]
+        out["mae"] = float(err.abs().mean())
+        out["max_err"] = float(err.abs().max())
+        out["sim_column"] = col
+
+    if display_rows:
+        cols = ["delta", "e", "alpha", "lambda", hat_col]
+        if hat_name == "C_hat":
+            cols += list(meta["sim_columns"]) + [meta["boa_column"]]
+        else:
+            cols.append(meta["sim_column"])
+        out["table"] = df[cols].round(4)
+
+    return out
+
+
+def print_hat_validation_summary(results_dir=None, n_mc=50_000):
+    """Print MAE table for B_hat, C_hat, D_hat against all saved CSV presets."""
+    for hat in ("B_hat", "C_hat", "D_hat"):
+        print(f"\n{'='*60}\n{hat}  profile {HAT_PROFILE_MAP[hat]['profile']}\n{'='*60}")
+        for preset in ("0702", "0805"):
+            try:
+                s = summarize_hat_vs_saved_csv(
+                    hat, preset=preset, results_dir=results_dir, n_mc=n_mc,
+                )
+            except FileNotFoundError as exc:
+                print(f"  {preset}: missing {exc}")
+                continue
+            pay = s["payoff"]
+            print(f"  {preset} (R={pay['r']}, P={pay['p']}) — {s['csv']} ({s['n_rows']} rows)")
+            if hat == "C_hat":
+                print(
+                    f"    P_direct_GT_analytic: MAE={s['mae_P_direct_GT_analytic']:.4f}, "
+                    f"max={s['max_err_P_direct_GT_analytic']:.4f}"
+                )
+                print(
+                    f"    P_direct_GT (traj):   MAE={s['mae_P_direct_GT']:.4f}, "
+                    f"max={s['max_err_P_direct_GT']:.4f}"
+                )
+            else:
+                print(
+                    f"    {s['sim_column']}: MAE={s['mae']:.4f}, max={s['max_err']:.4f}"
+                )
 
 
 def hitting_time_probability_C_hat(dq_a1d, dq_bc, target_a1d, target_bc):
@@ -613,7 +895,7 @@ def verify_trajectory_in_basin(q1, q2, case, t=1, r=0.7, p=0.2, s=0, epsilon=0.1
 
 
 def sample_acad_entry_points(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, n=200, seed=0):
-    """Sample (x_hat, y_hat) from AC,AD init using paper propagation (both branches)."""
+    """Sample (x_hat, y_hat) on A1D-first path only (eq. propagation)."""
     gamma, eps = d, epsilon
     rng = np.random.default_rng(seed)
     L = 1.0 / (1.0 - gamma)
@@ -621,20 +903,10 @@ def sample_acad_entry_points(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, n=200, 
     y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
     xs, ys = [], []
     for _ in range(n):
-        x1 = rng.uniform(-L, 0.0)
         x2 = rng.uniform(-L, 0.0)
+        x1 = rng.uniform(-L, x2)
         y1 = rng.uniform(-L, 0.0)
-        y2 = rng.uniform(-L, 0.0)
-        if abs(x1) > abs(x2):
-            xh, yh = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
-        elif abs(x2) > abs(x1):
-            if np.isclose(y_star - y2, 0.0):
-                continue
-            yh = y_star + y_star * (y1 - y_star) / (y_star - y2)
-            factor = y_star / (y_star - y2)
-            xh = x_star + factor * (x1 - x_star)
-        else:
-            continue
+        xh, yh = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
         if np.isnan(xh):
             continue
         xs.append(xh)

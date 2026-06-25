@@ -126,6 +126,47 @@ def generate_q_for_strategy(strategy, delta, T=1.0, x_sign=None, y_sign=None):
     return Q
 
 
+def _set_delta_q(q, state_idx, delta_q):
+    """Set Δq = q[1,s] - q[0,s] on one state, keeping q[0,s] random."""
+    q = np.array(q, dtype=float, copy=True)
+    base = np.random.uniform(0.05, 0.5)
+    q[0, state_idx] = base
+    q[1, state_idx] = base + delta_q
+    return q
+
+
+def generate_q_paper_uniform_acgt(delta, seed=None):
+    """
+    Q init for (AC, GT) with Δq_1(A1D), Δq_2(BC) uniform on [-L, 0] (eq. Chat).
+    """
+    rng = np.random.default_rng(seed)
+    L = 1.0 / (1.0 - delta)
+    dq1_a1d = rng.uniform(-L, 0.0)
+    dq2_bc = rng.uniform(-L, 0.0)
+    q1 = _set_delta_q(generate_q_for_strategy("AC", delta), 1, dq1_a1d)
+    q2 = _set_delta_q(generate_q_for_strategy("GT", delta), 0, dq2_bc)
+    return q1, q2
+
+
+def generate_q_paper_uniform_acad(delta, seed=None):
+    """
+    Q init for (AC, AD) with A1D-first: |Δq_1(BC)| > |Δq_1(A1D)|, all coords in [-L, 0].
+    """
+    rng = np.random.default_rng(seed)
+    L = 1.0 / (1.0 - delta)
+    x2 = rng.uniform(-L, 0.0)
+    x1 = rng.uniform(-L, x2)
+    y1 = rng.uniform(-L, 0.0)
+    y2 = rng.uniform(-L, 0.0)
+    q1 = generate_q_for_strategy("AC", delta)
+    q2 = generate_q_for_strategy("AD", delta)
+    q1 = _set_delta_q(q1, 0, x1)
+    q1 = _set_delta_q(q1, 1, x2)
+    q2 = _set_delta_q(q2, 0, y1)
+    q2 = _set_delta_q(q2, 1, y2)
+    return q1, q2
+
+
 class Algorithm:
     """Encapsulates the algorithm for calculating equilibria."""
     def __init__(self, e, lambda_val, alpha, delta, init_mode, tolerance, M, strategy1, t, r, p, s, strategy2, verbose=False):
@@ -134,9 +175,11 @@ class Algorithm:
         self.alpha = alpha
         self.delta = delta
         self.init_mode = init_mode
-        if self.init_mode == "fixed":
+        if self.init_mode in ("fixed", "paper_uniform"):
             if strategy1 is None or strategy2 is None:
-                raise ValueError("For init_mode='fixed', you must provide strategy1 and strategy2 lists.")
+                raise ValueError(
+                    f"For init_mode='{self.init_mode}', you must provide strategy1 and strategy2."
+                )
             self.strategy1 = strategy1
             self.strategy2 = strategy2
         self.tolerance = tolerance
@@ -195,11 +238,23 @@ class Algorithm:
             q1 = generate_q_for_strategy(self.strategy1, self.delta)
             q2 = generate_q_for_strategy(self.strategy2, self.delta)
 
+        elif self.init_mode == "paper_uniform":
+            s1 = getattr(self, "strategy1", "AC")
+            s2 = getattr(self, "strategy2", "GT")
+            if s1 == "AC" and s2 == "GT":
+                q1, q2 = generate_q_paper_uniform_acgt(self.delta)
+            elif s1 == "AC" and s2 == "AD":
+                q1, q2 = generate_q_paper_uniform_acad(self.delta)
+            else:
+                raise ValueError(
+                    "paper_uniform supports (AC,GT) for Ĉ and (AC,AD) for D̂ only."
+                )
+
         #elif self.init_mode == 'upload':
             
 
         else:
-            raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")
+            raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed' or 'paper_uniform'")
 
         return q1, q2
 
@@ -404,8 +459,20 @@ class Algorithm_1:
                 raise TypeError("strategy1 and strategy2 must be strings, e.g., 'AD', 'GT'")
             q1 = generate_q_for_strategy(self.strategy1, self.delta)
             q2 = generate_q_for_strategy(self.strategy2, self.delta)
+        elif self.init_mode == "paper_uniform":
+            s1, s2 = self.strategy1, self.strategy2
+            if s1 == "AC" and s2 == "GT":
+                q1, q2 = generate_q_paper_uniform_acgt(self.delta)
+            elif s1 == "AC" and s2 == "AD":
+                q1, q2 = generate_q_paper_uniform_acad(self.delta)
+            else:
+                raise ValueError(
+                    "paper_uniform supports (AC,GT) for Ĉ and (AC,AD) for D̂ only."
+                )
         else:
-            raise ValueError(f"Unknown mode: {self.init_mode}, must be 'latin' or 'uniform' or 'fixed'")
+            raise ValueError(
+                f"Unknown mode: {self.init_mode}, must be 'latin', 'uniform', 'fixed', or 'paper_uniform'"
+            )
 
         return q1, q2
     

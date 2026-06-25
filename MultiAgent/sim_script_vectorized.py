@@ -14,7 +14,8 @@ from datetime import datetime
 
 #this has been the function used for the simulations
 def run_experiment_chunk_vect(parameter_combinations_chunk, record_boundary=False,
-                              strategy1='AC', strategy2='GT', t=1, r=0.7, p=0.2, s=0):
+                              strategy1='AC', strategy2='GT', t=1, r=0.7, p=0.2, s=0,
+                              init_mode="fixed"):
     
     results_chunk = []
 
@@ -22,7 +23,7 @@ def run_experiment_chunk_vect(parameter_combinations_chunk, record_boundary=Fals
         algo = Algorithm(
             e=e, lambda_val=lambda_val, alpha=alpha, delta=delta,
             random_uniform=random_uniform, tolerance=1e-5,
-            init_mode="fixed", strategy1=strategy1, strategy2=strategy2,
+            init_mode=init_mode, strategy1=strategy1, strategy2=strategy2,
             t=t, r=r, p=p, s=s,
             M=int(M_value), verbose=False
         )

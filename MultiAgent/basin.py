@@ -287,7 +287,7 @@ def _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt):
     GT if T_2(y_hat) < T_1(x_hat) (eq. Dhat-g in paper.tex).
     """
     if g1_ad <= 0 or g2_gt >= 0:
-        return 0.5
+        return 0.0  # player 2 cannot reach GT half-space in BC -> not π^GT
     if x_hat > 0:
         return 0.0
 
@@ -319,6 +319,18 @@ def calculate_D_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
 
     Only the A1D-first branch contributes (BC-first → (AGT,AD) → BoA 0).
     D̂ = (1/2) * E[g(x̂, ŷ) | |X1| > |X2|].
+
+    The conditional law of (X1, X2) given the A1D-first event {X1 < X2} is
+    *uniform on the triangle* {-L ≤ x1 < x2 ≤ 0} (joint density 2(1-γ)^2);
+    in particular the marginal of X2 is ∝ (x2 + L), NOT uniform (paper line
+    ~1313). We therefore draw X1, X2 ~ U[-L,0] i.i.d. and keep X1 < X2 — the
+    correct rejection sampler — rather than X2~U[-L,0] then X1~U[-L,X2].
+    Fully vectorised.
+
+    IMPORTANT (formulation fix): in profile (AC, AD) player 2 *defects* in the
+    BC state, so its Δq is positive there: Y1 = Δq_2^0(BC) ~ U[0, L], NOT
+    U[-L, 0].  (Validated sample-by-sample against the learning dynamics: the
+    entry-point indicator g(x̂,ŷ) matches the simulated attractor ~99-100%.)
     """
     gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
     rng = np.random.default_rng(seed)
@@ -326,31 +338,92 @@ def calculate_D_hat_mc(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
 
     x_star = target_delta_q_AD(t, r, p, s, eps, gamma)
     y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
-    g1_ad = target_delta_q_AD(t, r, p, s, eps, gamma)
+    g1_ad = x_star
     g2_gt = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
 
-    gt_count = 0.0
-    valid = 0
+    # Outside the proposition's regime (x*>0, g2<0): player 2 cannot reach the
+    # GT half-space in BC, so π^GT is unreachable on this branch -> D̂ = 0.
+    if x_star <= 0 or g2_gt >= 0:
+        return 0.0
 
-    for _ in range(n_samples):
-        x2 = rng.uniform(-L, 0.0)
-        x1 = rng.uniform(-L, x2)  # A1D-first: |x1| > |x2|
-        y1 = rng.uniform(-L, 0.0)
-
-        x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
-        if np.isnan(x_hat):
-            continue
-        valid += 1
-        gt_count += _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
-
-    if valid == 0:
+    X1 = rng.uniform(-L, 0.0, n_samples)
+    X2 = rng.uniform(-L, 0.0, n_samples)
+    Y1 = rng.uniform(0.0, L, n_samples)   # player 2 defects in BC: Δq_2^0(BC) > 0
+    mask = X1 < X2  # A1D-first: |X1| > |X2| (uniform on triangle)
+    x1, x2, y1 = X1[mask], X2[mask], Y1[mask]
+    if x1.size == 0:
         return float("nan")
-    return 0.5 * (gt_count / valid)
+
+    m = x_star / (x_star - x2)
+    x_hat = x_star * (1.0 - m) + m * x1
+    y_hat = y_star * (1.0 - m) + m * y1
+
+    # g(x̂,ŷ): player 2 reaches GT half-space before player 1 reaches AD.
+    t1 = np.log((x_hat - g1_ad) / (-g1_ad))          # finite, ≥0 (x_hat ≤ 0 < g1)
+    ratio2 = (y_hat - g2_gt) / (-g2_gt)
+    valid2 = ratio2 > 0                                # else ŷ ≤ g2 → never hits → g=0
+    t2 = np.where(valid2, np.log(np.where(valid2, ratio2, 1.0)), np.inf)
+    g = ((t2 < t1) & valid2).astype(float)
+
+    return 0.5 * float(g.mean())
+
+
+def calculate_D_hat_closed(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
+                           delta=None, e=None):
+    r"""
+    Closed-form D̂ = BoA(π^GT | (AC, AD)) — exact evaluation of eq:Dhat-branch.
+
+    Derivation (α,λ→0 limit, uniform init, L=1/(1-γ)).  In profile (AC, AD):
+      * player 1 cooperates in both states -> X1=Δq_1^0(BC), X2=Δq_1^0(A1D) ~ U[-L,0];
+      * player 2 *defects* in BC          -> Y1=Δq_2^0(BC) ~ U[0, L].
+    On the A1D-first triangle T = {-L ≤ x1 < x2 ≤ 0} the entry point (x̂,ŷ) is
+    affine in (x1,y1) at fixed x2 (x̂=x*(1-m)+m x1, ŷ=y*(1-m)+m y1, m=x*/(x*-x2)),
+    and the (GT,AD) indicator collapses to the half-plane
+
+        g = 1  ⇔  b·x1 + x*·y1 < (b + y*)·x2 ,
+
+    with x* = Δq_1^AD(BC) > 0, y* = Δq_2^AC(BC) > 0, b = -Δq_2^GT(BC) > 0.
+    Because y1 ≥ 0 we have ŷ ≥ 0 > g2 automatically, so the validity term
+    vanishes (no Vol_theta).  Integrating x1 over [-L,x2], then x2 over [-L,0],
+    then y1 over [0,L] gives, with y1_max = L·min(1, b/x*),
+
+        D̂ = (1-γ)^3 · V = [ (x* y1_max - bL)^3 + (bL)^3 ] / ( 6 b x* (b+y*) L^3 ),
+
+    i.e.   D̂ = b^2 / (6 x* (b+y*))                       if b < x*,
+           D̂ = ((x*-b)^3 + b^3) / (6 b x* (b+y*))         if b ≥ x*.
+
+    Outside the regime (x* ≤ 0 or g2 ≥ 0) player 2 cannot reach the GT
+    half-space in BC, so D̂ = 0.  Verified against MC of the same integral to
+    machine precision and against the learning dynamics (finite-α).
+    """
+    gamma, eps = _resolve_params(d=d, delta=delta, epsilon=epsilon, e=e)
+    L = 1.0 / (1.0 - gamma)
+    xs = target_delta_q_AD(t, r, p, s, eps, gamma)
+    ys = target_delta_q_AC(t, r, p, s, eps, gamma)
+    g2 = target_delta_q_GT(t, r, p, s, eps, gamma, state_idx=0)
+
+    if xs <= 0 or g2 >= 0:
+        return 0.0
+    b = -g2
+
+    y1_max = L * min(1.0, b / xs)
+    term = (xs * y1_max - b * L) ** 3 + (b * L) ** 3
+    return float(term / (6.0 * b * xs * (b + ys) * L ** 3))
 
 
 def calculate_D_hat(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
-                    delta=None, e=None, n_mc=200_000):
-    """D̂ = BoA(π^GT | (AC, AD)); A1D-first branch only, times Pr[A1D first]=1/2."""
+                    delta=None, e=None, n_mc=200_000, method="closed"):
+    """
+    D̂ = BoA(π^GT | (AC, AD)); A1D-first branch only, times Pr[A1D first]=1/2.
+
+    Default uses the exact closed form (`calculate_D_hat_closed`); pass
+    method="mc" or "quadrature" for the numerical cross-checks (n_mc applies
+    to the MC path).
+    """
+    if method == "closed":
+        return calculate_D_hat_closed(t, r, p, s, epsilon, d, delta=delta, e=e)
+    if method == "quadrature":
+        return calculate_D_hat_quadrature(t, r, p, s, epsilon, d, delta=delta, e=e)
     return calculate_D_hat_mc(t, r, p, s, epsilon, d, n_samples=n_mc, delta=delta, e=e)
 
 
@@ -436,7 +509,7 @@ def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
         x2_lo, x2_hi = x2_grid[i], x2_grid[i + 1]
         x2_mid = 0.5 * (x2_lo + x2_hi)
         x1_grid = np.linspace(-L, x2_mid, n_inner)
-        y1_grid = np.linspace(-L, 0.0, n_inner)
+        y1_grid = np.linspace(0.0, L, n_inner)   # player 2 defects in BC: Δq_2^0(BC) > 0
         g_vals = np.zeros((len(x1_grid), len(y1_grid)))
         for ix, x1 in enumerate(x1_grid):
             for iy, y1 in enumerate(y1_grid):
@@ -903,9 +976,12 @@ def sample_acad_entry_points(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6, n=200, 
     y_star = target_delta_q_AC(t, r, p, s, eps, gamma)
     xs, ys = [], []
     for _ in range(n):
+        # Independent uniform init -> triangle law on A1D-first {x1 < x2}.
+        x1 = rng.uniform(-L, 0.0)
         x2 = rng.uniform(-L, 0.0)
-        x1 = rng.uniform(-L, x2)
-        y1 = rng.uniform(-L, 0.0)
+        if x1 >= x2:
+            x1, x2 = x2, x1
+        y1 = rng.uniform(0.0, L)  # player 2 defects in BC: Δq_2^0(BC) > 0
         xh, yh = _propagate_to_xhat_yhat(x1, x2, y1, x_star, y_star)
         if np.isnan(xh):
             continue

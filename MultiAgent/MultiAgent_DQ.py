@@ -150,14 +150,22 @@ def generate_q_paper_uniform_acgt(delta, seed=None):
 
 def generate_q_paper_uniform_acad(delta, seed=None):
     """
-    Q init for (AC, AD) with A1D-first: |Δq_1(BC)| > |Δq_1(A1D)|, all coords in [-L, 0].
+    Q init for (AC, AD), A1D-first branch (|Δq_1(BC)| > |Δq_1(A1D)|).
+
+    Correct signs for the profile:
+      * player 1 = AC  -> cooperates in both states -> Δq_1(BC), Δq_1(A1D) ~ U[-L, 0];
+      * player 2 = AD  -> defects   in both states -> Δq_2(BC), Δq_2(A1D) ~ U[ 0, L].
+    x1, x2 are drawn independently and ordered so that x1 < x2 (A1D-first), which
+    reproduces the uniform-on-triangle conditional law (not x1 ~ U[-L, x2]).
     """
     rng = np.random.default_rng(seed)
     L = 1.0 / (1.0 - delta)
+    x1 = rng.uniform(-L, 0.0)
     x2 = rng.uniform(-L, 0.0)
-    x1 = rng.uniform(-L, x2)
-    y1 = rng.uniform(-L, 0.0)
-    y2 = rng.uniform(-L, 0.0)
+    if x1 >= x2:
+        x1, x2 = x2, x1
+    y1 = rng.uniform(0.0, L)
+    y2 = rng.uniform(0.0, L)
     q1 = generate_q_for_strategy("AC", delta)
     q2 = generate_q_for_strategy("AD", delta)
     q1 = _set_delta_q(q1, 0, x1)

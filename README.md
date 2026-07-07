@@ -28,10 +28,31 @@ This project investigates the dynamics of Q-learning algorithms in multi-agent e
 │   └── comparison_algorithms.py  # Algorithm comparison utilities
 ├── SingleAgent/             # Single-agent analysis
 │   └── SingleAgent.py       # Single-agent Q-value calculations
+├── scripts/                 # Paper-figure reproduction scripts (see REPRODUCING.md)
+│   ├── export_paper_figures.py   # All simulation-result figures from results/*.csv
+│   ├── plot_phase_diagrams.py    # IBR phase diagrams (Python port of Mathematica plots)
+│   └── plot_vector_fields.py     # Vector-field figures vf_*.png
+├── images/                  # Figures referenced by paper.tex
+├── results/                 # Precomputed simulation CSVs used in the paper
+├── mathematica/             # Mathematica notebooks (symbolic derivations, provenance)
 ├── examples/                # Example scripts and usage demonstrations
 ├── utils.py                 # Utility functions for data processing and visualization
 └── dashboard.py             # Interactive dashboard for results visualization
 ```
+
+## Reproducing the paper figures
+
+See **[REPRODUCING.md](REPRODUCING.md)** for the full pipeline and
+**[FIGURE_MANIFEST.md](FIGURE_MANIFEST.md)** for the figure-by-figure mapping
+(paper label → file → generating script). Quick version:
+
+```bash
+python scripts/export_paper_figures.py   # simulation figures (from results/*.csv)
+python scripts/plot_phase_diagrams.py    # analytic phase diagrams
+python scripts/plot_vector_fields.py     # vector fields (slow: simulates trajectories)
+```
+
+No Mathematica needed for any figure.
 
 ## Installation
 

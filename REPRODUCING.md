@@ -1,4 +1,4 @@
-# Reproducing the figures in `paper.tex`
+# Reproducing the figures in the paper
 
 Everything a reviewer needs is Python. Mathematica is **not** required for any
 figure: the two notebook-derived phase diagrams are reproduced by a Python port
@@ -94,6 +94,4 @@ figures.
 Six conceptual figures are hand-drawn and their source files are not in the
 repository (see `FIGURE_MANIFEST.md`, "ORPHANED" rows): the state-space
 illustration, the within/across-batch timelines, the asynchronous best-response
-graph, and the best-response tree diagrams. These must be copied from the
-authors' figure archive (e.g. the Overleaf project) into `images/` before
-`paper.tex` compiles.
+graph, and the best-response tree diagrams. 

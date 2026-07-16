@@ -32,7 +32,7 @@ This project investigates the dynamics of Q-learning algorithms in multi-agent e
 │   ├── export_paper_figures.py   # All simulation-result figures from results/*.csv
 │   ├── plot_phase_diagrams.py    # IBR phase diagrams (Python port of Mathematica plots)
 │   └── plot_vector_fields.py     # Vector-field figures vf_*.png
-├── images/                  # Figures referenced by paper.tex
+├── images/                  # Figures referenced in the paper (link)
 ├── results/                 # Precomputed simulation CSVs used in the paper
 ├── mathematica/             # Mathematica notebooks (symbolic derivations, provenance)
 ├── examples/                # Example scripts and usage demonstrations

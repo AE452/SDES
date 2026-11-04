@@ -20,10 +20,10 @@ This repository reproduces the numerical results and code-generated figures asso
 | `results/` | Precomputed simulation CSVs used in the paper |
 | `data/` | Numeric grids written by the phase-diagram script |
 | `images/` | Figure outputs |
-| `mathematica/` | Symbolic provenance for the IBR graphs and critical curves |
+| `mathematica/Similarity_Bellman_eq_responses_GT_Space_Expected_SARSA.nb` | Symbolic provenance for the IBR graphs and critical curves |
 | `examples/` | Short usage demos |
 
-Mathematica is **not** required to regenerate figures. The notebooks are kept as derivation provenance for Proposition IBR (γ_c1, γ_c2 and graphs G1–G3).
+Mathematica is **not** required to regenerate figures. The notebook above is kept as derivation provenance for Proposition IBR (γ_c1, γ_c2 and graphs G1–G3).
 
 ## Setup
 
@@ -77,7 +77,7 @@ The CSVs already in `results/` are the data used for the published plots.
 | `fig:alpha_effect_ACAD` | `af0702_acad.png`, `af0805_acad.png` | `scripts/export_paper_figures.py` |
 | `fig:acad-entry` | `acad_entry_plane.png` | `scripts/export_paper_figures.py` |
 | `fig:phasediagrams` | `TwoActionPDsimilarityphased7e2.png`, `TwoActionPDsimilarityphaser8p2-Gamma.png` | `scripts/plot_phase_diagrams.py` |
-| `fig:IBRgraphs` | `IBRGraph1.pdf`–`IBRGraph3.pdf` | Mathematica notebook (provenance) |
+| `fig:IBRgraphs` | `IBRGraph1.pdf`–`IBRGraph3.pdf` | `mathematica/Similarity_Bellman_eq_responses_GT_Space_Expected_SARSA.nb` |
 | Vector-field figures | `vf_*.png` | `scripts/plot_vector_fields.py` |
 
 Payoff configurations used in the α-effect panels:

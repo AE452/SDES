@@ -103,7 +103,7 @@ If you use this code, please cite the paper and this repository:
   title        = {Soft Decentralized Expected {SARSA}: companion code},
   year         = {2026},
   howpublished = {GitHub repository},
-  url          = {https://github.com/AE452/Soft-Decentralized-Expected-SARSA}
+  url          = {https://github.com/AE452/SDES}
 }
 ```
 

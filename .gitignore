@@ -1,13 +1,23 @@
+# Private / paper workspace (not part of the public companion repo)
+submission/
 papers/
-results/
-mathematica/
 jmlr-coverletter-1.0/
+
+# Python
 .venv/
+venv/
 __pycache__/
-*.csv
-*.png
-*.pyc
-*.pdf
-*.tex
-*.DS_Store
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
 .DS_Store
+*.DS_Store
+.idea/
+.vscode/
+
+# Local scratch (do not ignore tracked results/, data/, images/)
+*.log
+3dinteractivea.html

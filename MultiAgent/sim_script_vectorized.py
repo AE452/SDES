@@ -1,16 +1,32 @@
+"""Vectorized Monte Carlo driver used to produce the CSVs in results/.
+
+Run from the repository root:
+    python MultiAgent/sim_script_vectorized.py
+
+Full grids are expensive (hours). The shipped CSVs in results/ are the data
+used for the paper figures.
+"""
 import itertools
 import time
-from MultiAgent_DQ import Algorithm_1 as Algorithm
-from utils import convert_dict_to_mean_df
-import pandas as pd
-import numpy as np
 import os
+import sys
 import gc
 import concurrent.futures
 import multiprocessing
 from gc import collect
 import logging
 from datetime import datetime
+
+import pandas as pd
+import numpy as np
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_MULTI = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _ROOT)
+sys.path.insert(0, _MULTI)
+
+from MultiAgent_DQ import Algorithm_1 as Algorithm  # noqa: E402
+from utils import convert_dict_to_mean_df  # noqa: E402
 
 #this has been the function used for the simulations
 def run_experiment_chunk_vect(parameter_combinations_chunk, record_boundary=False,

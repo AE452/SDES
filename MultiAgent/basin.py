@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import warnings
+
+# NumPy 2 renamed trapz -> trapezoid
+_trapz = getattr(np, "trapezoid", None) or np.trapz
 # --------------------------------------------------------
 # Geometric interpretation of strategies and Best Responses
 # 
@@ -483,7 +486,7 @@ def calculate_D_hat_factorized_wrong(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
     py = np.clip([_p_yhat_density(y, x_star, y_star, gamma) for y in ys], 0, None)
     g_grid = np.array([[_boa_gt_indicator_gtad(x, y, g1_ad, g2_gt) for y in ys] for x in xs])
     integrand = np.outer(px, py) * g_grid
-    p_gt_branch = np.trapz(np.trapz(integrand, ys, axis=1), xs)
+    p_gt_branch = _trapz(_trapz(integrand, ys, axis=1), xs)
     return 0.5 * float(p_gt_branch)
 
 
@@ -516,7 +519,7 @@ def calculate_D_hat_quadrature(t=1, r=0.7, p=0.2, s=0, epsilon=0.1, d=0.6,
                 x_hat, y_hat = _propagate_to_xhat_yhat(x1, x2_mid, y1, x_star, y_star)
                 if not np.isnan(x_hat):
                     g_vals[ix, iy] = _boa_gt_indicator_gtad(x_hat, y_hat, g1_ad, g2_gt)
-        inner = np.trapz(np.trapz(g_vals, y1_grid, axis=1), x1_grid)
+        inner = _trapz(_trapz(g_vals, y1_grid, axis=1), x1_grid)
         total += inner * dens * (x2_hi - x2_lo)
 
     return 0.5 * float(total)

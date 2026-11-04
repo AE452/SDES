@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Compare paper B_hat, C_hat, D_hat to existing simulation CSVs (no new runs).
-
-See Prop17_hats_reference.md for proofs, mapping, and when sim matches theory.
-"""
+"""Compare B_hat, C_hat, D_hat to the shipped simulation CSVs in results/ (no new runs)."""
 import os
 import sys
 
